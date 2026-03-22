@@ -1,0 +1,120 @@
+flowchart TD
+    %% Global Styles
+    classDef container fill:#f9f9f9,stroke:#333,stroke-width:2px,color:black,rx:5,ry:5;
+    classDef process fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:black,rx:5,ry:5;
+    classDef stressor fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:black,rx:5,ry:5;
+    classDef eval fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:black,rx:5,ry:5;
+    classDef note font-style:italic,fill:none,stroke:none,color:#666;
+
+    %% S1: Controlled Biomedical Corpus
+    subgraph S1 ["S1: Controlled Biomedical Corpus"]
+        direction TB
+        A1("BioASQ 13b Training Data<br>(Questions + Gold Snippets)")
+        A2("PubMed Abstracts via NCBI EFetch<br>(Linked PMIDs)")
+        A3("Section-Aware Chunking<br>(Background, Methods, Results, Conclusions)")
+        A4("Embed with MedCPT Encoder")
+        A5("Index Vectors in FAISS")
+        A6("Metadata: PMID, Section, ChunkID")
+        
+        A1 --> A3
+        A2 --> A3
+        A3 --> A4
+        A4 --> A5
+        A5 --> A6
+    end
+    class S1 container
+    class A1,A2,A3,A4,A5,A6 process
+
+    %% S2: Retrieval & Reranking
+    subgraph S2 ["S2: Dense Retrieval + Reranking"]
+        direction TB
+        B1("BioASQ Question")
+        B2("MedCPT Query Encoder")
+        B3("FAISS Dense Retrieval (Top-k=20)")
+        B4("Cross-Encoder Reranker (Top-n=5)")
+
+        B1 --> B2
+        B2 --> B3
+        B3 --> B4
+    end
+    class S2 container
+    class B1,B2,B3,B4 process
+
+    %% S3: Stressors
+    subgraph S3 ["S3: Controlled Evidence Perturbation"]
+        direction TB
+        C_Title("Stress-Test Intensity Sweeps")
+        
+        subgraph C_Base ["Baseline"]
+            C1("Clean Top-n Passages")
+            C2("No Modification")
+        end
+        
+        subgraph C_Noise ["Condition A: Noise"]
+            C3("Inject Irrelevant Passages")
+            C4("Inject Near-Miss Passages<br>(Same disease, different drug)")
+            C5("Intensities: 30%, 50%, 70%")
+        end
+        
+        subgraph C_Conflict ["Condition B: Conflict"]
+            C6("Inject Contradicting Passages")
+            C7("Support vs. Oppose Mixing")
+            C8("Ratios: 50/50, 70/30")
+        end
+        
+        subgraph C_Unans ["Condition C: Unanswerable"]
+            C9("Remove Answer-Bearing Passages")
+            C10("Remove Gold PMIDs")
+            C11("Levels: Partial / Full Removal")
+        end
+    end
+    class S3 container
+    class C_Base,C_Noise,C_Conflict,C_Unans stressor
+
+    %% S4: Generation
+    subgraph S4 ["S4: Generator (Fixed LLM)"]
+        D1("Model: Llama-3-8B-Instruct (Fixed)")
+        D2("Prompt Rules:")
+        D3("1. Answer only from evidence<br>2. Cite passage numbers<br>3. State 'Insufficient Evidence' if unsupported")
+        D4("Output: Answer + Citations")
+
+        D1 --- D2
+        D2 --- D3
+        D3 --> D4
+    end
+    class S4 container
+    class D1,D2,D3,D4 process
+
+    %% S5: Evaluation
+    subgraph S5 ["S5: Multi-Level Evaluation"]
+        direction TB
+        
+        subgraph E1 ["Task Metrics"]
+            E1a("Factoid/List: EM, F1")
+            E1b("Yes/No: Accuracy")
+            E1c("Summary: ROUGE-L")
+        end
+        
+        subgraph E2 ["Groundedness Metrics"]
+            E2a("Supported-Claim Rate")
+            E2b("NLI Faithfulness Score")
+            E2c("Citation Precision")
+            E2d("Abstention Rate")
+        end
+        
+        subgraph E3 ["Error Taxonomy"]
+            E3a("Unsupported Claims")
+            E3b("Conflict Blending")
+            E3c("Cherry-Picking")
+            E3d("Hallucination")
+        end
+    end
+    class S5 container
+    class E1,E2,E3 eval
+
+    %% Connections
+    S1 -->|"Corpus Index"| S2
+    S2 -->|"Top-n Candidates"| S3
+    S3 -->|"Stressed Evidence Set"| S4
+    S4 -->|"Generated Answer"| S5
+
