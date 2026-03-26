@@ -31,7 +31,15 @@ export function EvidenceCard({ passage, index }: EvidenceCardProps) {
           <span className="text-xs font-mono font-medium text-gray-500">
             [{index}]
           </span>
-          <span className="text-xs text-gray-500">PMID: {passage.pmid}</span>
+          <a
+            href={`https://pubmed.ncbi.nlm.nih.gov/${passage.pmid}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            PMID: {passage.pmid}
+          </a>
         </div>
         <Badge variant={style.color} className="text-[10px] px-1.5 py-0">
           {style.label}

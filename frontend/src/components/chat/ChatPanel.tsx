@@ -96,16 +96,33 @@ export function ChatPanel() {
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-16 text-gray-400">
-              <p className="text-lg font-medium mb-2">
-                {mode === "evaluation"
-                  ? "Select a question and run"
-                  : "Ask a biomedical question"}
-              </p>
-              <p className="text-sm">
-                {mode === "evaluation"
-                  ? "Choose a BioASQ question from the left panel, pick a condition, then click Run or press Enter"
-                  : "Type any biomedical question to get an answer with retrieved evidence"}
-              </p>
+              {mode === "evaluation" ? (
+                <>
+                  <p className="text-lg font-medium mb-2">
+                    Select a question and run
+                  </p>
+                  <p className="text-sm">
+                    Choose a BioASQ question from the left panel, pick a
+                    condition, then click Run or press Enter
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-medium mb-2">
+                    Ask a biomedical question
+                  </p>
+                  <p className="text-sm">
+                    Retrieval is limited to ~2,000 PubMed abstracts from the
+                    BioASQ Challenge 13 corpus. Questions outside this scope
+                    may not receive useful answers.
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Topics covered include biomedical questions from BioASQ
+                    training data (drug mechanisms, diseases, genes, proteins,
+                    etc.)
+                  </p>
+                </>
+              )}
             </div>
           )}
           {messages.map((msg) => (

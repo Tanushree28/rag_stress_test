@@ -120,10 +120,23 @@ def retrieval_metrics(
 # S5.2 -- NLI-based groundedness
 # ---------------------------------------------------------------------------
 
+def _strip_citations(text: str) -> str:
+    """Remove citation markers like [1], [2], [1,3] and 'states that' phrasing."""
+    text = re.sub(r"\[\d+(?:,\s*\d+)*\]", "", text)
+    text = re.sub(r"\bstates\s+that\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 def _split_sentences(text: str) -> list[str]:
-    """Simple sentence splitter."""
+    """Simple sentence splitter, strips citation markers for cleaner NLI input."""
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
-    return [s.strip() for s in sentences if len(s.strip()) > 10]
+    cleaned = []
+    for s in sentences:
+        s = _strip_citations(s.strip())
+        if len(s) > 10:
+            cleaned.append(s)
+    return cleaned
 
 
 def nli_groundedness(answer: str, passages: list[dict]) -> dict:

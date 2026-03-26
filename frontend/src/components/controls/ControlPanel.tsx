@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -39,10 +40,15 @@ export function ControlPanel() {
     setQuestions,
     selectedQuestion,
     setSelectedQuestion,
+    questionType,
+    setQuestionType,
     condition,
     setCondition,
     topK,
     setTopK,
+    selectedConditions,
+    setSelectedConditions,
+    toggleCondition,
     isComparing,
     setIsComparing,
     setComparisonResult,
@@ -56,10 +62,13 @@ export function ControlPanel() {
   }, [setQuestions]);
 
   const handleCompare = async () => {
-    if (!selectedQuestion) return;
+    if (!selectedQuestion || selectedConditions.length === 0) return;
     setIsComparing(true);
     try {
-      const res = await api.compare({ question_id: selectedQuestion.id });
+      const res = await api.compare({
+        question_id: selectedQuestion.id,
+        conditions: selectedConditions,
+      });
       setComparisonResult(res);
       useStore.getState().setActiveTab("comparison");
     } finally {
@@ -75,10 +84,13 @@ export function ControlPanel() {
     setCondition("clean");
   };
 
-  const filteredQuestions = questions;
+  const filteredQuestions =
+    questionType === "all"
+      ? questions
+      : questions.filter((q) => q.type === questionType);
 
   return (
-    <div className="w-72 border-r bg-gray-50/50 flex flex-col h-full overflow-y-auto">
+    <div className="border-r bg-gray-50/50 flex flex-col h-full overflow-y-auto">
       <div className="p-4 space-y-4">
         <div>
           <h2 className="text-sm font-medium text-gray-700 mb-1">Mode</h2>
@@ -97,7 +109,13 @@ export function ControlPanel() {
               <label className="text-xs font-medium text-gray-600 mb-1 block">
                 Question Type
               </label>
-              <Select defaultValue="all">
+              <Select
+                value={questionType}
+                onValueChange={(v: string | null) => {
+                  if (v) setQuestionType(v);
+                  setSelectedQuestion(null);
+                }}
+              >
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -116,8 +134,8 @@ export function ControlPanel() {
                 Question ({filteredQuestions.length})
               </label>
               <Select
-                value={selectedQuestion?.id || ""}
-                onValueChange={(id) => {
+                value={selectedQuestion?.id ?? ""}
+                onValueChange={(id: string | null) => {
                   if (!id) return;
                   const q = questions.find((q) => q.id === id);
                   if (q) setSelectedQuestion(q);
@@ -185,15 +203,63 @@ export function ControlPanel() {
         <Separator />
 
         {mode === "evaluation" && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full text-xs"
-            onClick={handleCompare}
-            disabled={!selectedQuestion || isComparing || isLoading}
-          >
-            {isComparing ? "Comparing..." : "Compare All Conditions"}
-          </Button>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-gray-600 block">
+              Compare Conditions
+            </label>
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {CONDITIONS.map((c) => (
+                <label
+                  key={c.value}
+                  className="flex items-center gap-2 text-xs cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selectedConditions.includes(c.value)}
+                    onCheckedChange={() => toggleCondition(c.value)}
+                  />
+                  {c.label}
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 text-xs"
+                onClick={() =>
+                  setSelectedConditions(CONDITIONS.map((c) => c.value))
+                }
+              >
+                All
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 text-xs"
+                onClick={() => setSelectedConditions([])}
+              >
+                None
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full text-xs"
+              onClick={handleCompare}
+              disabled={
+                !selectedQuestion ||
+                isComparing ||
+                isLoading ||
+                selectedConditions.length === 0
+              }
+            >
+              {isComparing
+                ? "Comparing..."
+                : `Compare ${selectedConditions.length} Condition${
+                    selectedConditions.length !== 1 ? "s" : ""
+                  }`}
+            </Button>
+          </div>
         )}
 
         <Button

@@ -10,7 +10,7 @@ export function EvidencePanel() {
   const { activeTab, setActiveTab } = useStore();
 
   return (
-    <div className="w-96 border-l bg-gray-50/50 flex flex-col h-full overflow-hidden">
+    <div className="border-l bg-gray-50/50 flex flex-col h-full overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
         <div className="px-3 pt-3">
           <TabsList className="w-full">

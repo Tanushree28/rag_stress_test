@@ -90,7 +90,42 @@ export interface Experiment {
   condition: string;
   answer: string;
   metrics: Metrics | null;
+  passages: Array<{ chunk_id?: string; pmid?: string }>;
   duration_s: number;
+}
+
+export interface AggregateGroup {
+  group: string;
+  count: number;
+  avg_map: number | null;
+  avg_mrr: number | null;
+  avg_ndcg: number | null;
+  avg_precision: number | null;
+  avg_scr: number | null;
+  avg_cp: number | null;
+  avg_entailment: number | null;
+  avg_task_score: number | null;
+}
+
+export interface AggregateResponse {
+  group_by: string;
+  groups: AggregateGroup[];
+}
+
+export interface BatchRunResult {
+  question_id: string;
+  condition?: string;
+  task_score?: number;
+  duration_s?: number;
+  error?: string;
+}
+
+export interface BatchRunResponse {
+  condition: string;
+  total: number;
+  completed: number;
+  failed: number;
+  results: BatchRunResult[];
 }
 
 export const api = {
@@ -133,13 +168,41 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  getHistory: (params?: { limit?: number; offset?: number }) => {
+  getHistory: (params?: {
+    limit?: number;
+    offset?: number;
+    condition?: string;
+    question_type?: string;
+    question_id?: string;
+  }) => {
     const qs = new URLSearchParams();
     if (params?.limit) qs.set("limit", String(params.limit));
     if (params?.offset) qs.set("offset", String(params.offset));
+    if (params?.condition) qs.set("condition", params.condition);
+    if (params?.question_type) qs.set("question_type", params.question_type);
+    if (params?.question_id) qs.set("question_id", params.question_id);
     const query = qs.toString();
     return request<{ total: number; experiments: Experiment[] }>(
       `/history${query ? `?${query}` : ""}`
     );
   },
+
+  getAggregateStats: (params?: { group_by?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.group_by) qs.set("group_by", params.group_by);
+    const query = qs.toString();
+    return request<AggregateResponse>(
+      `/aggregate/stats${query ? `?${query}` : ""}`
+    );
+  },
+
+  batchRun: (body: {
+    question_ids: string[];
+    condition?: string;
+    top_k?: number;
+  }) =>
+    request<BatchRunResponse>("/batch/run", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

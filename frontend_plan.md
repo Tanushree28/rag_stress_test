@@ -1,426 +1,187 @@
-# 🖥️ Frontend Plan: Biomedical RAG Stress-Test Dashboard
+# Frontend: Biomedical RAG Stress-Test Dashboard
 
-## 1. Main Goal
+## 1. Overview
 
-Build a **ChatGPT-like thesis demo app** where a user can:
+A research-grade thesis demo app where a user can:
 
-- Ask a biomedical question
-- Choose experiment settings from dropdowns
-- Run baseline or stressed retrieval
-- See answer + citations
-- Inspect evidence
-- Compare metrics visually
-
-The frontend should feel like a **research product demo**, not just a class project UI.
-
----
-
-## 2. Best Stack
-
-Use:
-
-- Next.js
-- React
-- Tailwind CSS
-- shadcn/ui
-- Recharts (for charts)
-
-### Benefits:
-
-- Modern look
-- Reusable UI components
-- Easy dropdowns, tabs, cards, sliders
-- Responsive layout
-- Polished demo quality
+- Ask biomedical questions (BioASQ 13 or free-form)
+- Choose perturbation conditions and compare selectively
+- Run baseline or stressed retrieval + generation + evaluation
+- See answer + citations with PubMed links
+- Inspect evidence passages with perturbation labels
+- Compare metrics visually (per-question and dataset-level)
+- View aggregate analytics across all experiments
 
 ---
 
-## 3. Core UI Layout
+## 2. Stack
 
-### Page Structure
-
-Use a **3-panel layout**:
-
----
-
-### Left Panel — Experiment Controls
-
-Where the user configures the run.
-
-**Include:**
-
-- Dataset dropdown
-- Question type dropdown
-- Condition dropdown:
-  - Baseline
-  - Noise
-  - Conflict
-  - Unanswerable
-- Intensity/ratio dropdowns
-- Retrieval settings:
-  - top-k
-  - top-n
-- Model dropdown
-- Run button
-- Reset button
+- **Next.js 16** (App Router)
+- **React 19**
+- **Tailwind CSS**
+- **shadcn/ui** (base-nova style, @base-ui/react primitives)
+- **Recharts** (BarChart, RadarChart)
+- **Zustand** (state management)
 
 ---
 
-### Center Panel — Chat Interface
+## 3. Pages
 
-Main visual focus.
-
-**Include:**
-
-- Project title / header
-- Chat history
-- User question bubble
-- Assistant answer bubble
-- Citations under answer
-- Expandable reasoning/evidence view
-- Input box at bottom
-- Send button
+| Route | Page | Purpose |
+|-------|------|---------|
+| `/` | Main Dashboard | 3-panel layout: controls, chat, evidence/metrics |
+| `/analytics` | Analytics | Aggregate condition summary + metric impact views |
+| `/history` | History | Expandable experiment history with full metrics |
 
 ---
 
-### Right Panel — Evidence + Metrics
+## 4. Main Dashboard (`/`)
 
-Where the system becomes powerful.
+### 3-Panel Layout (Resizable)
 
-**Tabs:**
+All three panels are **user-resizable** via drag handles between them. Widths persist in Zustand store with min/max constraints.
 
-- Evidence
-- Perturbation View
-- Metrics
-- Comparison
+#### Left Panel -- Experiment Controls
 
-**Inside:**
+- **Mode toggle**: Evaluation vs Free Chat (in header)
+- **Question type filter**: Dropdown (All / Factoid / List / Yesno / Summary) -- filters question list
+- **Question selector**: Scrollable list of BioASQ questions filtered by type
+- **Condition dropdown**: clean, noise_30, noise_50, noise_70, conflict_50, conflict_70, unanswerable_partial, unanswerable_full
+- **Top-k slider**: 1-20 (default 5)
+- **Run button**: Executes /ask pipeline
+- **Selective condition comparison**: Checkbox list of all 8 conditions with "Compare N Condition(s)" button (sends only checked conditions to /compare)
 
-- Retrieved passage cards
-- Labels:
-  - clean
-  - noisy
-  - contradictory
-  - removed
-- Metric cards
-- Performance charts
-- Baseline vs stressed comparison
+#### Center Panel -- Chat Interface
 
----
+- Chat message history (user + assistant bubbles)
+- Answer text with inline citation badges
+- Input box + send button at bottom
+- **Evaluation mode**: Uses selected BioASQ question, shows full metrics
+- **Free chat mode**: Any biomedical question; amber notice about corpus scope (~2,000 PubMed chunks from BioASQ 13); no task metrics
 
-## 4. Feature Breakdown
+#### Right Panel -- Evidence + Metrics
 
-### Feature 1: Chat Input
+Tabbed interface:
 
-User enters biomedical question.
-
-**Examples:**
-
-- “What are the treatments for pancreatic cancer?”
-- “Does drug X improve survival in disease Y?”
-
-**Output:**
-
-- Answer text
-- Citations
-- “Insufficient Evidence” when applicable
+- **Evidence tab**: Passage cards with PMID (clickable link to PubMed), section, snippet text, rank, perturbation tag. Color-coded: blue (clean), orange (noise), red (conflict), gray (removed).
+- **Metrics tab**: Retrieval (MAP@k, MRR@k, nDCG@k, P@k), Groundedness (SCR, Citation Precision, Avg Entailment), Task (Score, Type-specific)
+- **Comparison tab**: Grouped bar chart + metric delta cards per condition. Collapsible answer sections showing full generated answer + citation badges for each condition tested.
 
 ---
 
-### Feature 2: Condition Selector
+## 5. Analytics Page (`/analytics`)
 
-Most important control.
+Two tabs, populated from `GET /aggregate/stats` endpoint:
 
-**Dropdown:**
+### Tab 1: Condition Summary (AggregateView)
 
-- Baseline
-- Noise
-- Conflict
-- Unanswerable
+- **Table 1**: Rows = conditions, columns = all metrics (MAP, MRR, nDCG, P@k, SCR, CP, Entailment, Task). Answers: "which stress condition hurts most?"
+- **Bar chart**: Grouped bars showing MAP@k, SCR, Task Score, nDCG per condition
+- **Table 2**: Same metrics grouped by question type
+- **Radar chart**: Performance profile per question type (MAP, SCR, Task Score)
 
-#### Dynamic Controls:
+### Tab 2: Metric Impact (MetricImpactView)
 
-**Noise:**
-
-- Intensity: 30%, 50%, 70%
-- Type:
-  - irrelevant passages
-  - near-miss passages
-
-**Conflict:**
-
-- Ratio:
-  - 50/50
-  - 70/30
-- Mode:
-  - support vs oppose
-
-**Unanswerable:**
-
-- Level:
-  - partial removal
-  - full removal
+- **Heatmap table**: 3 rows (Retrieval, Groundedness, Task) x all condition columns. Cells colored green-to-red by score. Shows at a glance which perturbation hurts which metric family.
+- **Degradation delta chart**: Bar chart showing % change from clean baseline per condition. Negative bars = degradation. Reference line at 0. Answers: "does noise hurt more than conflict?" and "does retrieval degrade first or generation?"
 
 ---
 
-### Feature 3: Retrieval Controls
+## 6. History Page (`/history`)
 
-Collapsible advanced section.
-
-**Controls:**
-
-- top-k retrieval
-- top-n reranked passages
-- chunking strategy
-- section filter:
-  - Background
-  - Methods
-  - Results
-  - Conclusions
+- Paginated experiment list (newest first)
+- Each card is **expandable** (Collapsible component):
+  - **Collapsed**: Question (truncated), condition badge, task score, timestamp
+  - **Expanded**: Full question, full answer, 3-column metrics grid (retrieval / groundedness / task), passage PMIDs as clickable PubMed links
 
 ---
 
-### Feature 4: Evidence Viewer
+## 7. Two Levels of Analysis
 
-Each evidence chunk displayed as a card.
+### Per-Question Analysis
+- Run single question with any condition via `/ask`
+- Compare one question across selected conditions via `/compare`
+- View answer text, citations, evidence, and all metrics side-by-side
+- Use case: qualitative examples, case studies for thesis
 
-**Card Content:**
-
-- PMID
-- Section
-- Snippet text
-- Rank
-- Perturbation tag
-
-**Color Coding:**
-
-- Blue → baseline
-- Orange → noise
-- Red → conflict
-- Gray → removed/unanswerable
-
-**Optional:**
-
-- Highlight citation text
-- Show original vs modified
+### Dataset-Level / Aggregate Analysis
+- Populate DB via `/batch/run` (multiple questions, one condition)
+- View aggregate metrics on Analytics page grouped by condition or question type
+- Heatmap + degradation charts for thesis results tables/figures
+- Use case: quantitative results, statistical comparisons
 
 ---
 
-### Feature 5: Metrics Dashboard
-
-#### Retrieval Metrics
-
-- MAP@k
-- MRR@k
-- nDCG@k
-
-#### Groundedness Metrics
-
-- Supported Claim Rate
-- Citation Precision
-- Abstention Rate
-
-#### Task Metrics
-
-- EM
-- F1
-- Accuracy
-- ROUGE-L
-
----
-
-### Feature 6: Comparison Mode
-
-Very strong demo feature.
-
-**Toggle:**
-
-- Single run
-- Compare baseline vs stressed
-
-**View:**
-
-- Same question
-- Two answer panels
-- Two evidence sets
-- Side-by-side metric comparison
-
----
-
-## 5. UI Pages / Screens
-
-### Screen 1: Main Dashboard
-
-- Controls
-- Chat
-- Evidence + Metrics
-
----
-
-### Screen 2: Experiment History
-
-- Timestamp
-- Question
-- Condition
-- Model
-- Outcome summary
-
----
-
-### Screen 3: Batch Evaluation (Optional)
-
-- Multiple questions
-- Stress sweeps
-- Aggregate charts
-
----
-
-## 6. Recommended Development Phases
-
-### Phase 1 — Visual Shell
-
-- Header
-- 3-column layout
-- Sidebar controls
-- Chat area
-- Right panel tabs
-- Sample cards
-
----
-
-### Phase 2 — Interactive Controls
-
-- Working dropdowns
-- Sliders
-- Dynamic UI changes
-- Mock responses
-
----
-
-### Phase 3 — Backend Integration
-
-Endpoints:
-
-- `/ask`
-- `/retrieve`
-- `/perturb`
-- `/evaluate`
-- `/compare`
-
----
-
-### Phase 4 — Evidence + Metrics Rendering
-
-- Real evidence cards
-- Citation links
-- Metric cards
-- Charts
-
----
-
-### Phase 5 — Comparison Mode
-
-- Dual answers
-- Dual evidence
-- Delta metrics
-
----
-
-## 7. Component Plan
+## 8. Component Architecture
 
 ### Layout
-
-- AppLayout
-- Header
-- LeftControlPanel
-- ChatPanel
-- RightInsightPanel
+- `Header` -- mode toggle, nav links (Analytics, History)
+- `ResizeHandle` -- drag handle for panel resizing
 
 ### Controls
-
-- DatasetSelect
-- ConditionSelect
-- ModelSelect
-- RetrievalSettings
-- PerturbationControls
+- `ControlPanel` -- question type filter, question list, condition selector, top-k, run button, selective compare checkboxes
 
 ### Chat
-
-- ChatMessage
-- ChatInput
-- CitationList
-- AnswerCard
+- `ChatPanel` -- message list, input, mode-specific empty states
+- `ChatMessage` -- user/assistant bubbles with citation badges
 
 ### Evidence
+- `EvidencePanel` -- tab container (Evidence, Metrics, Comparison)
+- `EvidenceList` -- passage list with free-chat corpus notice
+- `EvidenceCard` -- passage card with clickable PMID PubMed link
+- `MetricsView` -- retrieval + groundedness + task metric cards
+- `ComparisonView` -- grouped bar chart, metric deltas, collapsible answers per condition
 
-- EvidenceCard
-- EvidenceList
-- PerturbationBadge
-
-### Metrics
-
-- MetricCard
-- MetricsGrid
-- ComparisonChart
-
----
-
-## 8. State Management Plan
-
-Use React state or Zustand.
-
-**State Objects:**
-
-- question
-- selectedCondition
-- selectedIntensity
-- selectedModel
-- retrievalSettings
-- answer
-- citations
-- evidence
-- metrics
-- comparisonResult
+### Analytics
+- `AggregateView` -- condition/question-type tables, bar chart, radar chart
+- `MetricImpactView` -- heatmap table, degradation delta chart
 
 ---
 
-## 9. Best Visual Style
+## 9. State Management (Zustand)
 
-- Soft neutral background
-- White cards
-- Rounded corners
-- Clean typography
-- Subtle shadows
-- Minimal bright colors
-- Strong spacing
+Key state slices:
 
-**Design Goal:**
-AI research dashboard + clinical decision support interface
-
----
-
-## 10. MVP Version
-
-**Build first:**
-
-- Question input
-- Condition dropdown
-- Intensity selector
-- Send button
-- Answer card
-- Evidence cards
-- Metrics cards
+| State | Purpose |
+|-------|---------|
+| `mode` | "evaluation" or "free-chat" |
+| `questionType` | Filter: "all", "factoid", "list", "yesno", "summary" |
+| `selectedQuestion` | Currently selected BioASQ question |
+| `selectedCondition` | Active perturbation condition |
+| `selectedConditions` | Array of checked conditions for comparison |
+| `topK` | Retrieval top-k setting |
+| `messages` | Chat message history |
+| `currentResult` | Latest /ask response |
+| `comparisonResult` | Latest /compare response |
+| `leftPanelWidth` / `rightPanelWidth` | Resizable panel widths (min/max constrained) |
+| `aggregateByCondition` / `aggregateByQuestionType` | Analytics data |
+| `analyticsLoading` | Loading state for analytics page |
 
 ---
 
-## 11. Best Final Version
+## 10. Backend Endpoints Used
 
-- Chat interface
-- Dynamic experiment controls
-- Evidence viewer
-- Perturbation labels
-- Metrics dashboard
-- Baseline vs stressed comparison
-- Experiment history
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Health check |
+| `/questions` | GET | List BioASQ questions (filtered by type) |
+| `/conditions` | GET | List perturbation conditions |
+| `/ask` | POST | Full pipeline: retrieve + perturb + generate + evaluate |
+| `/retrieve` | POST | Retrieval only |
+| `/perturb` | POST | Apply perturbation to passages |
+| `/evaluate` | POST | Evaluate answer against gold |
+| `/compare` | POST | Run pipeline across selected conditions |
+| `/history` | GET | Experiment history (filterable by condition, question_type, question_id) |
+| `/aggregate/stats` | GET | Aggregate metrics grouped by condition or question_type |
+| `/batch/run` | POST | Run pipeline on multiple questions with one condition |
 
 ---
+
+## 11. Visual Style
+
+- Soft neutral background (`gray-100`)
+- White cards with subtle borders
+- Rounded corners, clean typography
+- Minimal color: blue (retrieval), green (groundedness), amber (task), purple (nDCG)
+- Strong spacing, responsive layout
+- Research dashboard aesthetic

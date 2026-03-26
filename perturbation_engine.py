@@ -79,13 +79,12 @@ def _negate_with_llama(text: str) -> str:
         response = ollama.chat(
             model=LLAMA_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            options={"temperature": 0.7, "num_predict": 512},
+            options={"temperature": 0.5, "num_predict": 512},
         )
         return response["message"]["content"].strip()
     except Exception as e:
         logger.warning("LLaMA negation failed: %s", e)
         return text
-
 
 # ---------------------------------------------------------------------------
 # S3.1 -- Noise injection

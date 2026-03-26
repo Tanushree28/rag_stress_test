@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   AskResponse,
   CompareResponse,
+  AggregateResponse,
   Passage,
   Metrics,
   Question,
@@ -29,12 +30,19 @@ interface AppState {
   setQuestions: (questions: Question[]) => void;
   selectedQuestion: Question | null;
   setSelectedQuestion: (q: Question | null) => void;
+  questionType: string;
+  setQuestionType: (qt: string) => void;
 
   // Controls
   condition: string;
   setCondition: (c: string) => void;
   topK: number;
   setTopK: (k: number) => void;
+
+  // Selective comparison
+  selectedConditions: string[];
+  setSelectedConditions: (conditions: string[]) => void;
+  toggleCondition: (condition: string) => void;
 
   // Chat
   messages: ChatMessage[];
@@ -58,6 +66,20 @@ interface AppState {
   // Right panel tab
   activeTab: string;
   setActiveTab: (tab: string) => void;
+
+  // Panel widths
+  leftPanelWidth: number;
+  setLeftPanelWidth: (w: number) => void;
+  rightPanelWidth: number;
+  setRightPanelWidth: (w: number) => void;
+
+  // Analytics
+  aggregateByCondition: AggregateResponse | null;
+  setAggregateByCondition: (data: AggregateResponse | null) => void;
+  aggregateByQuestionType: AggregateResponse | null;
+  setAggregateByQuestionType: (data: AggregateResponse | null) => void;
+  analyticsLoading: boolean;
+  setAnalyticsLoading: (loading: boolean) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -68,11 +90,31 @@ export const useStore = create<AppState>((set) => ({
   setQuestions: (questions) => set({ questions }),
   selectedQuestion: null,
   setSelectedQuestion: (q) => set({ selectedQuestion: q }),
+  questionType: "all",
+  setQuestionType: (questionType) => set({ questionType }),
 
   condition: "clean",
   setCondition: (condition) => set({ condition }),
   topK: 5,
   setTopK: (topK) => set({ topK }),
+
+  selectedConditions: [
+    "clean",
+    "noise_30",
+    "noise_50",
+    "noise_70",
+    "conflict_50",
+    "conflict_70",
+    "unanswerable_partial",
+    "unanswerable_full",
+  ],
+  setSelectedConditions: (selectedConditions) => set({ selectedConditions }),
+  toggleCondition: (condition) =>
+    set((state) => ({
+      selectedConditions: state.selectedConditions.includes(condition)
+        ? state.selectedConditions.filter((c) => c !== condition)
+        : [...state.selectedConditions, condition],
+    })),
 
   messages: [],
   addMessage: (msg) =>
@@ -92,4 +134,20 @@ export const useStore = create<AppState>((set) => ({
 
   activeTab: "evidence",
   setActiveTab: (activeTab) => set({ activeTab }),
+
+  leftPanelWidth: 288,
+  setLeftPanelWidth: (w) =>
+    set({ leftPanelWidth: Math.max(200, Math.min(480, w)) }),
+  rightPanelWidth: 384,
+  setRightPanelWidth: (w) =>
+    set({ rightPanelWidth: Math.max(280, Math.min(600, w)) }),
+
+  aggregateByCondition: null,
+  setAggregateByCondition: (aggregateByCondition) =>
+    set({ aggregateByCondition }),
+  aggregateByQuestionType: null,
+  setAggregateByQuestionType: (aggregateByQuestionType) =>
+    set({ aggregateByQuestionType }),
+  analyticsLoading: false,
+  setAnalyticsLoading: (analyticsLoading) => set({ analyticsLoading }),
 }));

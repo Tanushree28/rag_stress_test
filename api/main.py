@@ -106,6 +106,11 @@ async def lifespan(app: FastAPI):
     else:
         _questions = load_bioasq(max_questions=400)
         logger.info("Loaded %d questions from BioASQ", len(_questions))
+        # Persist so perturbation_engine can load them
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(questions_path, "w") as f:
+            json.dump(_questions, f)
+        logger.info("Saved %d questions to %s", len(_questions), questions_path)
     yield
 
 
@@ -350,15 +355,39 @@ def compare_endpoint(req: CompareRequest):
 
 
 @app.get("/history")
-def history_endpoint(limit: int = 50, offset: int = 0):
-    """Get experiment history from SQLite."""
+def history_endpoint(
+    limit: int = 50,
+    offset: int = 0,
+    condition: str | None = None,
+    question_type: str | None = None,
+    question_id: str | None = None,
+):
+    """Get experiment history from SQLite with optional filters."""
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
+
+    where_clauses: list[str] = []
+    params: list = []
+    if condition:
+        where_clauses.append("condition = ?")
+        params.append(condition)
+    if question_type:
+        where_clauses.append("question_type = ?")
+        params.append(question_type)
+    if question_id:
+        where_clauses.append("question_id = ?")
+        params.append(question_id)
+
+    where_sql = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    total = conn.execute(
+        f"SELECT COUNT(*) FROM experiments{where_sql}", params
+    ).fetchone()[0]
+
     rows = conn.execute(
-        "SELECT * FROM experiments ORDER BY id DESC LIMIT ? OFFSET ?",
-        (limit, offset),
+        f"SELECT * FROM experiments{where_sql} ORDER BY id DESC LIMIT ? OFFSET ?",
+        params + [limit, offset],
     ).fetchall()
-    total = conn.execute("SELECT COUNT(*) FROM experiments").fetchone()[0]
     conn.close()
 
     experiments = []
@@ -369,3 +398,135 @@ def history_endpoint(limit: int = 50, offset: int = 0):
         experiments.append(exp)
 
     return {"total": total, "offset": offset, "limit": limit, "experiments": experiments}
+
+
+@app.get("/aggregate/stats")
+def aggregate_stats(group_by: str = "condition"):
+    """Aggregate metrics grouped by condition or question_type."""
+    if group_by not in ("condition", "question_type"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid group_by: {group_by}. Must be 'condition' or 'question_type'.",
+        )
+
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    all_rows = conn.execute(
+        """SELECT condition, question_type, metrics
+           FROM experiments
+           WHERE metrics IS NOT NULL AND metrics != '{}'"""
+    ).fetchall()
+    conn.close()
+
+    from collections import defaultdict
+
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for row in all_rows:
+        key = row[group_by]
+        metrics = json.loads(row["metrics"])
+        if metrics:
+            groups[key].append(metrics)
+
+    result = []
+    for key, metrics_list in sorted(groups.items()):
+        if not metrics_list or key is None:
+            continue
+        count = len(metrics_list)
+
+        def safe_avg(extractor):
+            vals = []
+            for m in metrics_list:
+                try:
+                    v = extractor(m)
+                    if v is not None:
+                        vals.append(v)
+                except (KeyError, TypeError):
+                    pass
+            return sum(vals) / len(vals) if vals else None
+
+        result.append({
+            "group": key,
+            "count": count,
+            "avg_map": safe_avg(lambda m: m["retrieval"]["map_at_k"]),
+            "avg_mrr": safe_avg(lambda m: m["retrieval"]["mrr_at_k"]),
+            "avg_ndcg": safe_avg(lambda m: m["retrieval"]["ndcg_at_k"]),
+            "avg_precision": safe_avg(lambda m: m["retrieval"]["precision_at_k"]),
+            "avg_scr": safe_avg(lambda m: m["groundedness"]["supported_claim_rate"]),
+            "avg_cp": safe_avg(lambda m: m["groundedness"]["citation_precision"]),
+            "avg_entailment": safe_avg(lambda m: m["groundedness"]["avg_entailment_score"]),
+            "avg_task_score": safe_avg(lambda m: m["task"]["score"]),
+        })
+
+    return {"group_by": group_by, "groups": result}
+
+
+class BatchRunRequest(BaseModel):
+    question_ids: list[str]
+    condition: str = "clean"
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+@app.post("/batch/run")
+def batch_run(req: BatchRunRequest):
+    """Run /ask on multiple questions with a given condition."""
+    if req.condition not in CONDITION_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown condition: {req.condition}",
+        )
+
+    results = []
+    completed = 0
+    failed = 0
+
+    for qid in req.question_ids:
+        q = _find_question(qid)
+        if not q:
+            results.append({"question_id": qid, "error": "not found"})
+            failed += 1
+            continue
+
+        try:
+            start = time.time()
+            passages = retrieve(q["body"], top_k=req.top_k)
+            snippets = q.get("snippets")
+            perturbed = apply_perturbation(passages, req.condition, snippets=snippets)
+            gen_result = generate(q["body"], perturbed)
+            metrics = evaluate(q["body"], gen_result["answer"], perturbed, q)
+            if metrics.get("groundedness"):
+                metrics["groundedness"].pop("details", None)
+            duration = time.time() - start
+
+            _save_experiment({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "question_id": qid,
+                "question_type": q["type"],
+                "question_body": q["body"],
+                "condition": req.condition,
+                "answer": gen_result["answer"],
+                "metrics": metrics,
+                "passages": [
+                    {"chunk_id": p.get("chunk_id"), "pmid": p.get("pmid")}
+                    for p in perturbed
+                ],
+                "duration_s": round(duration, 2),
+            })
+
+            results.append({
+                "question_id": qid,
+                "condition": req.condition,
+                "task_score": metrics["task"]["score"],
+                "duration_s": round(duration, 2),
+            })
+            completed += 1
+        except Exception as e:
+            results.append({"question_id": qid, "error": str(e)})
+            failed += 1
+
+    return {
+        "condition": req.condition,
+        "total": len(req.question_ids),
+        "completed": completed,
+        "failed": failed,
+        "results": results,
+    }
