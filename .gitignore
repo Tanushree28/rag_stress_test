@@ -42,3 +42,4 @@ frontend/out/
 
 # Logs
 *.log
+.claude/worktrees/

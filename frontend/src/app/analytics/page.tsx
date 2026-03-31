@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AggregateView } from "@/components/analytics/AggregateView";
 import { MetricImpactView } from "@/components/analytics/MetricImpactView";
+import { DegradationCurvesView } from "@/components/analytics/DegradationCurvesView";
 
 export default function AnalyticsPage() {
   const {
@@ -26,6 +27,7 @@ export default function AnalyticsPage() {
         setAggregateByCondition(byCondition);
         setAggregateByQuestionType(byType);
       })
+      .catch(() => {})
       .finally(() => setAnalyticsLoading(false));
   }, [setAggregateByCondition, setAggregateByQuestionType, setAnalyticsLoading]);
 
@@ -50,11 +52,15 @@ export default function AnalyticsPage() {
             Loading aggregate data...
           </p>
         ) : (
-          <Tabs defaultValue="aggregate">
+          <Tabs defaultValue="degradation">
             <TabsList>
+              <TabsTrigger value="degradation">Degradation Curves</TabsTrigger>
               <TabsTrigger value="aggregate">Condition Summary</TabsTrigger>
               <TabsTrigger value="impact">Metric Impact</TabsTrigger>
             </TabsList>
+            <TabsContent value="degradation" className="mt-4">
+              <DegradationCurvesView />
+            </TabsContent>
             <TabsContent value="aggregate" className="mt-4">
               <AggregateView />
             </TabsContent>

@@ -1,0 +1,20 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "FastAPI Backend",
+      "runtimeExecutable": "/Users/tanushreenepal/Desktop/rag_stress_test/venv/bin/uvicorn",
+      "runtimeArgs": ["api.main:app", "--host", "0.0.0.0", "--port", "8000"],
+      "cwd": "/Users/tanushreenepal/Desktop/rag_stress_test",
+      "port": 8000
+    },
+    {
+      "name": "Next.js Frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "/Users/tanushreenepal/Desktop/rag_stress_test/frontend",
+      "port": 3000,
+      "autoPort": false
+    }
+  ]
+}

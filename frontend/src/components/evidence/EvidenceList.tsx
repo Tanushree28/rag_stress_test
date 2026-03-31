@@ -17,12 +17,20 @@ export function EvidenceList() {
   const mode = useStore.getState().mode;
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-gray-500 mb-2">
+    <div className="space-y-3">
+      {currentResult.answer && (
+        <div className="rounded-lg border bg-white p-3">
+          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">
+            Answer — {currentResult.condition}
+          </p>
+          <p className="text-xs text-gray-700 whitespace-pre-wrap">{currentResult.answer}</p>
+        </div>
+      )}
+      <p className="text-xs text-gray-500">
         {currentResult.passages.length} passages retrieved
       </p>
       {mode === "free-chat" && (
-        <p className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded mb-2">
+        <p className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded">
           Corpus: BioASQ 13 training set (~2,000 PubMed chunks). Results may
           be incomplete for queries outside this scope.
         </p>

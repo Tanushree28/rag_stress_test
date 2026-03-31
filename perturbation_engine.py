@@ -8,6 +8,7 @@ Conditions:
   - Unanswerable partial/full: remove answer-bearing passages
 """
 
+import hashlib
 import json
 import logging
 import math
@@ -16,28 +17,20 @@ from pathlib import Path
 
 import ollama
 
+import db
+
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path("data")
-CHUNKS_PATH = DATA_DIR / "chunks.json"
 QUESTIONS_PATH = DATA_DIR / "questions.json"
 LLAMA_MODEL = "llama3.1:8b"
 
-_all_chunks = None
 _all_questions = None
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _load_all_chunks() -> list[dict]:
-    global _all_chunks
-    if _all_chunks is None:
-        with open(CHUNKS_PATH) as f:
-            _all_chunks = json.load(f)
-    return _all_chunks
-
 
 def _load_all_questions() -> list[dict]:
     global _all_questions
@@ -50,24 +43,24 @@ def _load_all_questions() -> list[dict]:
 def _get_near_miss_chunks(query_pmids: set[str], n: int) -> list[dict]:
     """Get chunks from other questions that share disease keywords but
     are NOT from the current question's PMIDs (near-miss noise)."""
-    all_chunks = _load_all_chunks()
-    candidates = [c for c in all_chunks if c["pmid"] not in query_pmids]
-    if len(candidates) <= n:
-        return candidates
-    return random.sample(candidates, n)
+    return db.get_random_chunks_excluding(query_pmids, n)
 
 
 def _get_irrelevant_chunks(query_pmids: set[str], n: int) -> list[dict]:
     """Get random chunks unrelated to the current question."""
-    all_chunks = _load_all_chunks()
-    candidates = [c for c in all_chunks if c["pmid"] not in query_pmids]
-    if len(candidates) <= n:
-        return candidates
-    return random.sample(candidates, n)
+    return db.get_random_chunks_excluding(query_pmids, n)
 
 
 def _negate_with_llama(text: str) -> str:
-    """Use LLaMA 3.1:8b to rewrite a passage to contradict its main claim."""
+    """Use LLaMA 3.1:8b to rewrite a passage to contradict its main claim.
+    Results are cached in SQLite to avoid redundant Ollama calls."""
+    text_hash = hashlib.sha256(text.encode()).hexdigest()
+
+    cached = db.get_negation(text_hash)
+    if cached is not None:
+        logger.info("Negation cache hit")
+        return cached
+
     prompt = (
         "Rewrite the following biomedical passage so that it contradicts "
         "its main claim. Keep the passage plausible, roughly the same length, "
@@ -81,7 +74,9 @@ def _negate_with_llama(text: str) -> str:
             messages=[{"role": "user", "content": prompt}],
             options={"temperature": 0.5, "num_predict": 512},
         )
-        return response["message"]["content"].strip()
+        negated = response["message"]["content"].strip()
+        db.save_negation(text_hash, negated)
+        return negated
     except Exception as e:
         logger.warning("LLaMA negation failed: %s", e)
         return text
@@ -186,21 +181,39 @@ def _is_answer_bearing(passage: dict, snippets: list[dict]) -> bool:
     return passage_pmid in snippet_pmids
 
 
+def _extract_key_terms(question_body: str) -> set[str]:
+    """Extract biomedical key terms from a question for relevance checking."""
+    stop_words = {
+        "what", "which", "how", "does", "is", "are", "was", "were", "the",
+        "a", "an", "of", "in", "for", "to", "and", "or", "with", "by",
+        "on", "at", "from", "that", "this", "it", "its", "can", "do",
+        "has", "have", "been", "be", "not", "no", "but", "so", "if",
+        "there", "their", "they", "them", "than", "then", "about",
+        "will", "would", "could", "should", "may", "might", "between",
+    }
+    import re
+    words = re.findall(r'\b\w+\b', question_body.lower())
+    return {w for w in words if w not in stop_words and len(w) >= 4}
+
+
 def make_unanswerable(
     passages: list[dict],
     mode: str = "full",
     snippets: list[dict] | None = None,
+    question_body: str = "",
 ) -> list[dict]:
-    """Remove answer-bearing passages.
+    """Remove answer-bearing passages and replace remaining relevant ones
+    with irrelevant content so the model truly cannot answer.
 
     Args:
         passages: list of retrieved passage dicts
         mode: 'full' removes all answer-bearing, 'partial' removes half
         snippets: gold snippets from BioASQ question (for PMID matching)
+        question_body: the question text (used to detect topically similar passages)
 
     Returns:
-        Filtered list with answer-bearing passages removed.
-        Removed entries get 'was_removed': True in a separate metadata return.
+        Filtered list with answer-bearing passages removed and remaining
+        relevant passages replaced with irrelevant ones.
     """
     if not snippets:
         logger.warning("No snippets provided; returning passages unchanged")
@@ -227,6 +240,27 @@ def make_unanswerable(
 
     for p in removed:
         p["was_removed"] = True
+
+    # For full mode: replace ALL remaining passages with irrelevant ones.
+    # Any remaining passage (even one not gold-PMID-matched) may still
+    # contain the answer, so we swap everything out to guarantee the model
+    # has zero evidence to work from.
+    if mode == "full" and kept:
+        all_pmids = {p["pmid"] for p in passages}
+        irrelevant_pool = db.get_random_chunks_excluding(all_pmids, len(kept) * 3)
+
+        replaced_kept = []
+        for i, p in enumerate(kept):
+            if i < len(irrelevant_pool):
+                replacement = dict(irrelevant_pool[i])
+                replacement["replaced_relevant"] = True
+                replaced_kept.append(replacement)
+            else:
+                # Fallback: mark the passage so the caller knows it survived
+                p_copy = dict(p)
+                p_copy["replacement_unavailable"] = True
+                replaced_kept.append(p_copy)
+        kept = replaced_kept
 
     logger.info(
         "Unanswerable (%s): removed %d/%d answer-bearing passages, %d remain",
@@ -255,6 +289,7 @@ def apply_perturbation(
     passages: list[dict],
     condition: str | dict,
     snippets: list[dict] | None = None,
+    question_body: str = "",
 ) -> list[dict]:
     """Apply a named perturbation condition to passages.
 
@@ -263,6 +298,7 @@ def apply_perturbation(
         condition: either a condition name string (e.g. 'noise_50')
                    or a dict with 'type' and parameters
         snippets: gold snippets (needed for unanswerable conditions)
+        question_body: question text (needed for unanswerable to detect relevant passages)
 
     Returns:
         Perturbed passage list.
@@ -295,6 +331,7 @@ def apply_perturbation(
             passages,
             mode=condition["mode"],
             snippets=snippets,
+            question_body=question_body,
         )
     else:
         raise ValueError(f"Unknown condition type: {ctype}")

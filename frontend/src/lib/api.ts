@@ -72,6 +72,16 @@ export interface CompareResult {
   citations: number[];
   metrics: Metrics;
   duration_s: number;
+  from_cache?: boolean;
+  error?: string;
+  passages?: Array<{
+    text: string;
+    pmid: string;
+    chunk_id: string;
+    rerank_score?: number;
+    faiss_score?: number;
+    source?: string;
+  }>;
 }
 
 export interface CompareResponse {
@@ -112,6 +122,43 @@ export interface AggregateResponse {
   groups: AggregateGroup[];
 }
 
+export interface MetricStats {
+  mean: number | null;
+  std: number | null;
+  n: number;
+}
+
+export interface DegradationCondition {
+  condition: string;
+  count: number;
+  map_at_k: MetricStats;
+  mrr_at_k: MetricStats;
+  ndcg_at_k: MetricStats;
+  precision_at_k: MetricStats;
+  scr: MetricStats;
+  citation_precision: MetricStats;
+  entailment: MetricStats;
+  task_score: MetricStats;
+}
+
+export interface DegradationResponse {
+  conditions: DegradationCondition[];
+}
+
+export interface CrosstabRow {
+  condition: string;
+  question_type: string;
+  count: number;
+  avg_map: number | null;
+  avg_scr: number | null;
+  avg_task_score: number | null;
+  avg_ndcg: number | null;
+}
+
+export interface CrosstabResponse {
+  rows: CrosstabRow[];
+}
+
 export interface BatchRunResult {
   question_id: string;
   condition?: string;
@@ -126,6 +173,21 @@ export interface BatchRunResponse {
   completed: number;
   failed: number;
   results: BatchRunResult[];
+}
+
+export interface BatchExperimentJob {
+  job_id: string;
+  status: string;
+  completed: number;
+  total: number;
+  failed: number;
+  started_at: string;
+}
+
+export interface StartBatchExperimentRequest {
+  n_per_type: number;
+  conditions: string[];
+  top_k: number;
 }
 
 export const api = {
@@ -196,6 +258,12 @@ export const api = {
     );
   },
 
+  getDegradation: () =>
+    request<DegradationResponse>("/aggregate/degradation"),
+
+  getCrosstab: () =>
+    request<CrosstabResponse>("/aggregate/crosstab"),
+
   batchRun: (body: {
     question_ids: string[];
     condition?: string;
@@ -205,4 +273,112 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  prefetch: (body: { question: string; top_k?: number }) =>
+    request<{ count: number; faiss_top_score: number; cached: boolean }>(
+      "/prefetch",
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+
+  corpusStats: () =>
+    request<{
+      abstracts_by_source: Record<string, number>;
+      total_abstracts: number;
+      total_chunks: number;
+      embedded_chunks: number;
+      faiss_vectors: number | null;
+    }>("/corpus/stats"),
+
+  compareStream: async function* (body: {
+    question_id: string;
+    conditions?: string[];
+    use_cache?: boolean;
+  }): AsyncGenerator<
+    | { type: "start"; total_conditions: number }
+    | { type: "result"; data: CompareResult }
+    | { type: "error"; condition: string; error: string }
+  > {
+    const res = await fetch(`${API_BASE}/compare/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(`API ${res.status}: ${await res.text()}`);
+    }
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (payload === "[DONE]") return;
+        try {
+          yield JSON.parse(payload);
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+  },
+
+  askStream: async function* (body: {
+    question: string;
+    question_id?: string;
+    condition?: string;
+    top_k?: number;
+  }): AsyncGenerator<
+    | { type: "token"; content: string }
+    | { type: "complete"; citations: number[]; metrics: Metrics | null; passages: Passage[] }
+  > {
+    const res = await fetch(`${API_BASE}/ask/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(`API ${res.status}: ${await res.text()}`);
+    }
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (payload === "[DONE]") return;
+        try {
+          yield JSON.parse(payload);
+        } catch {
+          // skip malformed lines
+        }
+      }
+    }
+  },
+
+  startBatchExperiment: (body: StartBatchExperimentRequest) =>
+    request<BatchExperimentJob>("/batch/experiment", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  getBatchJobStatus: (jobId: string) =>
+    request<BatchExperimentJob>(`/batch/experiment/${jobId}`),
 };

@@ -52,6 +52,37 @@ def parse_citations(answer: str) -> list[int]:
     return sorted(set(int(m) for m in re.findall(r"\[(\d+)\]", answer)))
 
 
+def generate_stream(
+    query: str,
+    passages: list[dict],
+    temperature: float = 0.3,
+    max_tokens: int = 512,
+):
+    """Streaming variant: yields token strings as they arrive from Ollama."""
+    if not passages:
+        yield "I cannot answer this question based on the provided evidence."
+        return
+
+    user_prompt = build_prompt(query, passages)
+    try:
+        stream = ollama.chat(
+            model=LLAMA_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            options={"temperature": temperature, "num_predict": max_tokens},
+            stream=True,
+        )
+        for chunk in stream:
+            content = chunk.get("message", {}).get("content", "")
+            if content:
+                yield content
+    except Exception as e:
+        logger.error("Ollama streaming failed: %s", e)
+        yield "Generation failed due to an internal error."
+
+
 def generate(
     query: str,
     passages: list[dict],

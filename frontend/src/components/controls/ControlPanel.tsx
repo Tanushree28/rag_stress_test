@@ -49,32 +49,16 @@ export function ControlPanel() {
     selectedConditions,
     setSelectedConditions,
     toggleCondition,
-    isComparing,
-    setIsComparing,
     setComparisonResult,
-    isLoading,
     clearMessages,
     setCurrentResult,
   } = useStore();
 
   useEffect(() => {
-    api.getQuestions({ limit: 400 }).then((res) => setQuestions(res.questions));
+    api.getQuestions({ limit: 400 })
+      .then((res) => setQuestions(res.questions))
+      .catch(() => {});
   }, [setQuestions]);
-
-  const handleCompare = async () => {
-    if (!selectedQuestion || selectedConditions.length === 0) return;
-    setIsComparing(true);
-    try {
-      const res = await api.compare({
-        question_id: selectedQuestion.id,
-        conditions: selectedConditions,
-      });
-      setComparisonResult(res);
-      useStore.getState().setActiveTab("comparison");
-    } finally {
-      setIsComparing(false);
-    }
-  };
 
   const handleReset = () => {
     clearMessages();
@@ -138,7 +122,10 @@ export function ControlPanel() {
                 onValueChange={(id: string | null) => {
                   if (!id) return;
                   const q = questions.find((q) => q.id === id);
-                  if (q) setSelectedQuestion(q);
+                  if (q) {
+                    setSelectedQuestion(q);
+                    api.prefetch({ question: q.body, top_k: topK }).catch(() => {});
+                  }
                 }}
               >
                 <SelectTrigger className="h-8 text-xs">
@@ -205,7 +192,7 @@ export function ControlPanel() {
         {mode === "evaluation" && (
           <div className="space-y-2">
             <label className="text-xs font-medium text-gray-600 block">
-              Compare Conditions
+              Conditions to Run
             </label>
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {CONDITIONS.map((c) => (
@@ -226,9 +213,7 @@ export function ControlPanel() {
                 size="sm"
                 variant="outline"
                 className="flex-1 text-xs"
-                onClick={() =>
-                  setSelectedConditions(CONDITIONS.map((c) => c.value))
-                }
+                onClick={() => setSelectedConditions(CONDITIONS.map((c) => c.value))}
               >
                 All
               </Button>
@@ -241,24 +226,6 @@ export function ControlPanel() {
                 None
               </Button>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full text-xs"
-              onClick={handleCompare}
-              disabled={
-                !selectedQuestion ||
-                isComparing ||
-                isLoading ||
-                selectedConditions.length === 0
-              }
-            >
-              {isComparing
-                ? "Comparing..."
-                : `Compare ${selectedConditions.length} Condition${
-                    selectedConditions.length !== 1 ? "s" : ""
-                  }`}
-            </Button>
           </div>
         )}
 

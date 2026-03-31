@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import type {
   AskResponse,
+  BatchExperimentJob,
   CompareResponse,
+  CompareResult,
   AggregateResponse,
   Passage,
   Metrics,
@@ -63,6 +65,19 @@ interface AppState {
   isComparing: boolean;
   setIsComparing: (c: boolean) => void;
 
+  // Progressive comparison (SSE)
+  partialResults: CompareResult[];
+  addPartialResult: (r: CompareResult) => void;
+  clearPartialResults: () => void;
+  completedConditions: number;
+  totalConditions: number;
+  setCompareProgress: (completed: number, total: number) => void;
+
+  // Streaming answer
+  streamingAnswer: string;
+  setStreamingAnswer: (s: string) => void;
+  appendStreamingToken: (token: string) => void;
+
   // Right panel tab
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -80,6 +95,11 @@ interface AppState {
   setAggregateByQuestionType: (data: AggregateResponse | null) => void;
   analyticsLoading: boolean;
   setAnalyticsLoading: (loading: boolean) => void;
+
+  // Batch experiment
+  batchJob: BatchExperimentJob | null;
+  setBatchJob: (job: BatchExperimentJob | null) => void;
+  clearBatchJob: () => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -132,6 +152,20 @@ export const useStore = create<AppState>((set) => ({
   isComparing: false,
   setIsComparing: (isComparing) => set({ isComparing }),
 
+  partialResults: [],
+  addPartialResult: (r) =>
+    set((state) => ({ partialResults: [...state.partialResults, r] })),
+  clearPartialResults: () => set({ partialResults: [], completedConditions: 0, totalConditions: 0 }),
+  completedConditions: 0,
+  totalConditions: 0,
+  setCompareProgress: (completed, total) =>
+    set({ completedConditions: completed, totalConditions: total }),
+
+  streamingAnswer: "",
+  setStreamingAnswer: (streamingAnswer) => set({ streamingAnswer }),
+  appendStreamingToken: (token) =>
+    set((state) => ({ streamingAnswer: state.streamingAnswer + token })),
+
   activeTab: "evidence",
   setActiveTab: (activeTab) => set({ activeTab }),
 
@@ -150,4 +184,8 @@ export const useStore = create<AppState>((set) => ({
     set({ aggregateByQuestionType }),
   analyticsLoading: false,
   setAnalyticsLoading: (analyticsLoading) => set({ analyticsLoading }),
+
+  batchJob: null,
+  setBatchJob: (batchJob) => set({ batchJob }),
+  clearBatchJob: () => set({ batchJob: null }),
 }));

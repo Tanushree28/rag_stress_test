@@ -1,11 +1,14 @@
 """
 S2 -- Retriever
-Encode query with MedCPT, search FAISS index for top-20,
-rerank with cross-encoder to top-5.
+Encode query with MedCPT, search FAISS index for top-k,
+then merge with SQLite FTS keyword results for hybrid retrieval,
+and rerank combined candidates with cross-encoder to top-5.
+
+Chunk metadata loaded from SQLite (db.py) instead of JSON.
 """
 
-import json
 import logging
+import re
 from pathlib import Path
 
 import faiss
@@ -14,11 +17,12 @@ import torch
 from sentence_transformers import CrossEncoder
 from transformers import AutoModel, AutoTokenizer
 
+import db
+
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path("data")
 INDEX_PATH = DATA_DIR / "faiss.index"
-CHUNKS_PATH = DATA_DIR / "chunks.json"
 MEDCPT_QUERY_MODEL = "ncbi/MedCPT-Query-Encoder"
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
@@ -27,7 +31,6 @@ _query_encoder = None
 _query_tokenizer = None
 _cross_encoder = None
 _faiss_index = None
-_chunks = None
 
 
 # ---------------------------------------------------------------------------
@@ -56,17 +59,13 @@ def _get_cross_encoder():
     return _cross_encoder
 
 
-def _get_index_and_chunks():
-    global _faiss_index, _chunks
+def _get_index():
+    global _faiss_index
     if _faiss_index is None:
         logger.info("Loading FAISS index from %s", INDEX_PATH)
         _faiss_index = faiss.read_index(str(INDEX_PATH))
-        with open(CHUNKS_PATH) as f:
-            _chunks = json.load(f)
-        logger.info(
-            "Index loaded: %d vectors, %d chunks", _faiss_index.ntotal, len(_chunks)
-        )
-    return _faiss_index, _chunks
+        logger.info("Index loaded: %d vectors", _faiss_index.ntotal)
+    return _faiss_index
 
 
 # ---------------------------------------------------------------------------
@@ -101,26 +100,72 @@ def encode_query(query: str) -> np.ndarray:
 # S2.2 -- FAISS search
 # ---------------------------------------------------------------------------
 
-def search_faiss(query_embedding: np.ndarray, k: int = 20) -> list[dict]:
+def search_faiss(query_embedding: np.ndarray, k: int = 100) -> list[dict]:
     """Search FAISS index and return top-k candidate passages.
 
     Each result dict has the chunk fields plus 'faiss_score' and 'faiss_rank'.
     """
-    index, chunks = _get_index_and_chunks()
+    index = _get_index()
     k = min(k, index.ntotal)
 
     query_vec = query_embedding.reshape(1, -1).astype("float32")
     scores, indices = index.search(query_vec, k)
 
+    # Batch lookup from SQLite
+    valid_indices = [int(idx) for idx in indices[0] if idx >= 0]
+    chunk_list = db.get_chunks_by_ids(valid_indices)
+    chunk_map = {c["id"]: c for c in chunk_list}
+
     results = []
     for rank, (score, idx) in enumerate(zip(scores[0], indices[0])):
-        if idx < 0:
+        idx = int(idx)
+        if idx < 0 or idx not in chunk_map:
             continue
-        chunk = dict(chunks[idx])
+        chunk = dict(chunk_map[idx])
         chunk["faiss_score"] = float(score)
         chunk["faiss_rank"] = rank
         results.append(chunk)
 
+    return results
+
+
+# ---------------------------------------------------------------------------
+# S2.2b -- Keyword search (SQLite FTS / LIKE fallback)
+# ---------------------------------------------------------------------------
+
+def _extract_keywords(query: str) -> str:
+    """Extract meaningful keywords from a biomedical query for FTS search."""
+    # Remove common question words and short words
+    stop_words = {
+        "what", "which", "how", "does", "is", "are", "was", "were", "the",
+        "a", "an", "of", "in", "for", "to", "and", "or", "with", "by",
+        "on", "at", "from", "that", "this", "it", "its", "can", "do",
+        "has", "have", "been", "be", "not", "no", "but", "so", "if",
+        "about", "there", "their", "they", "them", "than", "then",
+        "will", "would", "could", "should", "may", "might", "between",
+    }
+    # Keep words that are likely biomedical terms (longer, capitalized, or specific)
+    words = re.findall(r'\b\w+\b', query)
+    keywords = []
+    for w in words:
+        w_lower = w.lower()
+        if w_lower in stop_words:
+            continue
+        if len(w) < 3:
+            continue
+        keywords.append(w_lower)
+    return " ".join(keywords)
+
+
+def search_keywords(query: str, limit: int = 50) -> list[dict]:
+    """Search using keyword matching, return chunk dicts with source='keyword'."""
+    keywords = _extract_keywords(query)
+    if not keywords:
+        return []
+
+    results = db.keyword_search(keywords, limit=limit)
+    for r in results:
+        r["source"] = r.get("source", "keyword")
     return results
 
 
@@ -152,21 +197,51 @@ def rerank(query: str, candidates: list[dict], top_k: int = 5) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# S2.4 -- Full retrieval pipeline
+# S2.4 -- Hybrid retrieval pipeline
 # ---------------------------------------------------------------------------
 
-def retrieve(query: str, initial_k: int = 20, top_k: int = 5) -> list[dict]:
-    """Full retrieval pipeline: encode -> FAISS search -> cross-encoder rerank.
+def retrieve(query: str, initial_k: int = 100, top_k: int = 5) -> list[dict]:
+    """Hybrid retrieval: FAISS semantic search + keyword search -> cross-encoder rerank.
+
+    1. FAISS: top initial_k by MedCPT embedding similarity
+    2. Keyword: top 50 by SQLite FTS5/BM25 (or LIKE fallback)
+    3. Merge & deduplicate by chunk id
+    4. Cross-encoder rerank combined candidates -> top_k
 
     Returns top_k passages with scores from both stages.
     """
+    # Semantic search
     query_embedding = encode_query(query)
-    candidates = search_faiss(query_embedding, k=initial_k)
-    results = rerank(query, candidates, top_k=top_k)
+    faiss_candidates = search_faiss(query_embedding, k=initial_k)
+
+    # Keyword search
+    keyword_candidates = search_keywords(query, limit=50)
+
+    # Merge: deduplicate by chunk id, FAISS results take priority
+    seen_ids = set()
+    merged = []
+    for c in faiss_candidates:
+        cid = c.get("id") or c.get("chunk_id")
+        if cid not in seen_ids:
+            seen_ids.add(cid)
+            merged.append(c)
+    for c in keyword_candidates:
+        cid = c.get("id") or c.get("chunk_id")
+        if cid not in seen_ids:
+            seen_ids.add(cid)
+            merged.append(c)
 
     logger.info(
-        "Retrieved %d -> reranked to %d for: %s",
-        len(candidates), len(results), query[:80],
+        "Hybrid retrieval: %d FAISS + %d keyword = %d unique candidates for: %s",
+        len(faiss_candidates), len(keyword_candidates), len(merged), query[:80],
+    )
+
+    # Cross-encoder rerank the merged candidate pool
+    results = rerank(query, merged, top_k=top_k)
+
+    logger.info(
+        "Reranked to %d for: %s",
+        len(results), query[:80],
     )
     return results
 
@@ -178,7 +253,7 @@ def retrieve(query: str, initial_k: int = 20, top_k: int = 5) -> list[dict]:
 def faiss_max_score(query: str) -> float:
     """Return the top-1 FAISS score for a query (used to decide fallback)."""
     embedding = encode_query(query)
-    index, _ = _get_index_and_chunks()
+    index = _get_index()
     scores, _ = index.search(embedding.reshape(1, -1), 1)
     return float(scores[0][0])
 
@@ -188,6 +263,8 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    db.init_db()
 
     # Quick test: retrieve for a sample BioASQ question
     results = retrieve("Is Hirschsprung disease a mendelian or multifactorial disorder?")

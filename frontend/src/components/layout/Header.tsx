@@ -53,6 +53,12 @@ export function Header() {
           >
             History
           </Link>
+          <Link
+            href="/batch"
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            Batch Run
+          </Link>
         </div>
       </div>
     </header>
