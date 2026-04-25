@@ -1,0 +1,380 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "RAG Stress-Test" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e6]: /
+        - generic [ref=e7]: Analytics
+      - generic [ref=e8]:
+        - generic [ref=e9]: Retriever
+        - combobox [ref=e10]:
+          - option "hybrid" [selected]
+          - option "faiss_only"
+          - option "bm25_only"
+          - option "no_rerank"
+    - main [ref=e11]:
+      - generic [ref=e23]:
+        - tablist [ref=e24]:
+          - tab "Degradation Curves" [ref=e25]
+          - tab "Condition Summary" [ref=e26]
+          - tab "Metric Impact" [ref=e27]
+          - tab "Significance" [active] [selected] [ref=e28]
+        - tabpanel "Significance" [ref=e622]:
+          - generic [ref=e623]:
+            - generic [ref=e624]:
+              - heading "Paired Significance Tests vs clean" [level=3] [ref=e625]
+              - paragraph [ref=e626]: Each cell compares a condition against the baseline on matched question-IDs. Reports p-value, Cohen's d effect size, and Δ (mean difference). Lower p = stronger evidence the metric actually changed. Stars mark p<0.05 (*), p<0.01 (**), p<0.001 (***).
+            - generic [ref=e627]:
+              - generic [ref=e628]:
+                - text: "Test:"
+                - combobox "Test:" [ref=e629]:
+                  - option "Wilcoxon signed-rank" [selected]
+                  - option "Paired t-test"
+              - generic [ref=e630]:
+                - text: "Baseline:"
+                - combobox "Baseline:" [ref=e631]:
+                  - option "clean" [selected]
+                  - option "noise_30"
+                  - option "noise_50"
+            - table [ref=e633]:
+              - rowgroup [ref=e634]:
+                - row "Condition MAP@k nDCG@k MRR@k SCR Citation P Entail Task" [ref=e635]:
+                  - columnheader "Condition" [ref=e636]
+                  - columnheader "MAP@k" [ref=e637]
+                  - columnheader "nDCG@k" [ref=e638]
+                  - columnheader "MRR@k" [ref=e639]
+                  - columnheader "SCR" [ref=e640]
+                  - columnheader "Citation P" [ref=e641]
+                  - columnheader "Entail" [ref=e642]
+                  - columnheader "Task" [ref=e643]
+              - rowgroup [ref=e644]:
+                - row "noise 30 p = 2.5e-18*** d = -0.95 (large) Δ = -21.5% n = 141 p = 1.5e-17*** d = -0.94 (large) Δ = -16.0% n = 141 p = 9.96e-7*** d = -0.47 (small) Δ = -15.9% n = 141 p = 0.242 d = 0.11 (negligible) Δ = +2.8% n = 141 p = 0.751 d = 0.03 (negligible) Δ = +0.6% n = 141 p = 0.641 d = 0.09 (negligible) Δ = +2.0% n = 141 p = 0.627 d = -0.02 (negligible) Δ = -0.6% n = 141" [ref=e645]:
+                  - cell "noise 30" [ref=e646]
+                  - cell "p = 2.5e-18*** d = -0.95 (large) Δ = -21.5% n = 141" [ref=e647]:
+                    - generic [ref=e648]: p = 2.5e-18***
+                    - generic [ref=e649]:
+                      - text: d = -0.95
+                      - generic [ref=e650]: (large)
+                    - generic [ref=e651]: Δ = -21.5%
+                    - generic [ref=e652]: n = 141
+                  - cell "p = 1.5e-17*** d = -0.94 (large) Δ = -16.0% n = 141" [ref=e653]:
+                    - generic [ref=e654]: p = 1.5e-17***
+                    - generic [ref=e655]:
+                      - text: d = -0.94
+                      - generic [ref=e656]: (large)
+                    - generic [ref=e657]: Δ = -16.0%
+                    - generic [ref=e658]: n = 141
+                  - cell "p = 9.96e-7*** d = -0.47 (small) Δ = -15.9% n = 141" [ref=e659]:
+                    - generic [ref=e660]: p = 9.96e-7***
+                    - generic [ref=e661]:
+                      - text: d = -0.47
+                      - generic [ref=e662]: (small)
+                    - generic [ref=e663]: Δ = -15.9%
+                    - generic [ref=e664]: n = 141
+                  - cell "p = 0.242 d = 0.11 (negligible) Δ = +2.8% n = 141" [ref=e665]:
+                    - generic [ref=e666]: p = 0.242
+                    - generic [ref=e667]:
+                      - text: d = 0.11
+                      - generic [ref=e668]: (negligible)
+                    - generic [ref=e669]: Δ = +2.8%
+                    - generic [ref=e670]: n = 141
+                  - cell "p = 0.751 d = 0.03 (negligible) Δ = +0.6% n = 141" [ref=e671]:
+                    - generic [ref=e672]: p = 0.751
+                    - generic [ref=e673]:
+                      - text: d = 0.03
+                      - generic [ref=e674]: (negligible)
+                    - generic [ref=e675]: Δ = +0.6%
+                    - generic [ref=e676]: n = 141
+                  - cell "p = 0.641 d = 0.09 (negligible) Δ = +2.0% n = 141" [ref=e677]:
+                    - generic [ref=e678]: p = 0.641
+                    - generic [ref=e679]:
+                      - text: d = 0.09
+                      - generic [ref=e680]: (negligible)
+                    - generic [ref=e681]: Δ = +2.0%
+                    - generic [ref=e682]: n = 141
+                  - cell "p = 0.627 d = -0.02 (negligible) Δ = -0.6% n = 141" [ref=e683]:
+                    - generic [ref=e684]: p = 0.627
+                    - generic [ref=e685]:
+                      - text: d = -0.02
+                      - generic [ref=e686]: (negligible)
+                    - generic [ref=e687]: Δ = -0.6%
+                    - generic [ref=e688]: n = 141
+                - row "noise 50 p = 2.8e-20*** d = -1.21 (large) Δ = -33.8% n = 140 p = 1.2e-20*** d = -1.33 (large) Δ = -27.0% n = 140 p = 1.74e-10*** d = -0.67 (medium) Δ = -22.6% n = 140 p = 0.558 d = 0.07 (negligible) Δ = +1.9% n = 140 p = 0.637 d = 0.08 (negligible) Δ = +1.9% n = 140 p = 0.977 d = 0.09 (negligible) Δ = +2.2% n = 140 p = 0.037* d = -0.16 (negligible) Δ = -5.3% n = 140" [ref=e689]:
+                  - cell "noise 50" [ref=e690]
+                  - cell "p = 2.8e-20*** d = -1.21 (large) Δ = -33.8% n = 140" [ref=e691]:
+                    - generic [ref=e692]: p = 2.8e-20***
+                    - generic [ref=e693]:
+                      - text: d = -1.21
+                      - generic [ref=e694]: (large)
+                    - generic [ref=e695]: Δ = -33.8%
+                    - generic [ref=e696]: n = 140
+                  - cell "p = 1.2e-20*** d = -1.33 (large) Δ = -27.0% n = 140" [ref=e697]:
+                    - generic [ref=e698]: p = 1.2e-20***
+                    - generic [ref=e699]:
+                      - text: d = -1.33
+                      - generic [ref=e700]: (large)
+                    - generic [ref=e701]: Δ = -27.0%
+                    - generic [ref=e702]: n = 140
+                  - cell "p = 1.74e-10*** d = -0.67 (medium) Δ = -22.6% n = 140" [ref=e703]:
+                    - generic [ref=e704]: p = 1.74e-10***
+                    - generic [ref=e705]:
+                      - text: d = -0.67
+                      - generic [ref=e706]: (medium)
+                    - generic [ref=e707]: Δ = -22.6%
+                    - generic [ref=e708]: n = 140
+                  - cell "p = 0.558 d = 0.07 (negligible) Δ = +1.9% n = 140" [ref=e709]:
+                    - generic [ref=e710]: p = 0.558
+                    - generic [ref=e711]:
+                      - text: d = 0.07
+                      - generic [ref=e712]: (negligible)
+                    - generic [ref=e713]: Δ = +1.9%
+                    - generic [ref=e714]: n = 140
+                  - cell "p = 0.637 d = 0.08 (negligible) Δ = +1.9% n = 140" [ref=e715]:
+                    - generic [ref=e716]: p = 0.637
+                    - generic [ref=e717]:
+                      - text: d = 0.08
+                      - generic [ref=e718]: (negligible)
+                    - generic [ref=e719]: Δ = +1.9%
+                    - generic [ref=e720]: n = 140
+                  - cell "p = 0.977 d = 0.09 (negligible) Δ = +2.2% n = 140" [ref=e721]:
+                    - generic [ref=e722]: p = 0.977
+                    - generic [ref=e723]:
+                      - text: d = 0.09
+                      - generic [ref=e724]: (negligible)
+                    - generic [ref=e725]: Δ = +2.2%
+                    - generic [ref=e726]: n = 140
+                  - cell "p = 0.037* d = -0.16 (negligible) Δ = -5.3% n = 140" [ref=e727]:
+                    - generic [ref=e728]: p = 0.037*
+                    - generic [ref=e729]:
+                      - text: d = -0.16
+                      - generic [ref=e730]: (negligible)
+                    - generic [ref=e731]: Δ = -5.3%
+                    - generic [ref=e732]: n = 140
+                - row "noise 70 p = 2.0e-22*** d = -1.44 (large) Δ = -47.8% n = 140 p = 2.0e-22*** d = -1.76 (large) Δ = -41.6% n = 140 p = 1.4e-15*** d = -1.07 (large) Δ = -34.3% n = 140 p = 0.450 d = 0.05 (negligible) Δ = +1.9% n = 140 p = 0.108 d = 0.15 (negligible) Δ = +4.5% n = 140 p = 0.746 d = 0.07 (negligible) Δ = +2.4% n = 140 p = 0.003** d = -0.20 (small) Δ = -6.7% n = 140" [ref=e733]:
+                  - cell "noise 70" [ref=e734]
+                  - cell "p = 2.0e-22*** d = -1.44 (large) Δ = -47.8% n = 140" [ref=e735]:
+                    - generic [ref=e736]: p = 2.0e-22***
+                    - generic [ref=e737]:
+                      - text: d = -1.44
+                      - generic [ref=e738]: (large)
+                    - generic [ref=e739]: Δ = -47.8%
+                    - generic [ref=e740]: n = 140
+                  - cell "p = 2.0e-22*** d = -1.76 (large) Δ = -41.6% n = 140" [ref=e741]:
+                    - generic [ref=e742]: p = 2.0e-22***
+                    - generic [ref=e743]:
+                      - text: d = -1.76
+                      - generic [ref=e744]: (large)
+                    - generic [ref=e745]: Δ = -41.6%
+                    - generic [ref=e746]: n = 140
+                  - cell "p = 1.4e-15*** d = -1.07 (large) Δ = -34.3% n = 140" [ref=e747]:
+                    - generic [ref=e748]: p = 1.4e-15***
+                    - generic [ref=e749]:
+                      - text: d = -1.07
+                      - generic [ref=e750]: (large)
+                    - generic [ref=e751]: Δ = -34.3%
+                    - generic [ref=e752]: n = 140
+                  - cell "p = 0.450 d = 0.05 (negligible) Δ = +1.9% n = 140" [ref=e753]:
+                    - generic [ref=e754]: p = 0.450
+                    - generic [ref=e755]:
+                      - text: d = 0.05
+                      - generic [ref=e756]: (negligible)
+                    - generic [ref=e757]: Δ = +1.9%
+                    - generic [ref=e758]: n = 140
+                  - cell "p = 0.108 d = 0.15 (negligible) Δ = +4.5% n = 140" [ref=e759]:
+                    - generic [ref=e760]: p = 0.108
+                    - generic [ref=e761]:
+                      - text: d = 0.15
+                      - generic [ref=e762]: (negligible)
+                    - generic [ref=e763]: Δ = +4.5%
+                    - generic [ref=e764]: n = 140
+                  - cell "p = 0.746 d = 0.07 (negligible) Δ = +2.4% n = 140" [ref=e765]:
+                    - generic [ref=e766]: p = 0.746
+                    - generic [ref=e767]:
+                      - text: d = 0.07
+                      - generic [ref=e768]: (negligible)
+                    - generic [ref=e769]: Δ = +2.4%
+                    - generic [ref=e770]: n = 140
+                  - cell "p = 0.003** d = -0.20 (small) Δ = -6.7% n = 140" [ref=e771]:
+                    - generic [ref=e772]: p = 0.003**
+                    - generic [ref=e773]:
+                      - text: d = -0.20
+                      - generic [ref=e774]: (small)
+                    - generic [ref=e775]: Δ = -6.7%
+                    - generic [ref=e776]: n = 140
+                - row "conflict 50 — — — p = 0.326 d = 0.09 (negligible) Δ = +2.4% n = 140 p = 0.426 d = -0.06 (negligible) Δ = -1.2% n = 140 p = 0.770 d = 0.07 (negligible) Δ = +1.7% n = 140 p = 0.099 d = -0.08 (negligible) Δ = -2.5% n = 140" [ref=e777]:
+                  - cell "conflict 50" [ref=e778]
+                  - cell "—" [ref=e779]
+                  - cell "—" [ref=e780]
+                  - cell "—" [ref=e781]
+                  - cell "p = 0.326 d = 0.09 (negligible) Δ = +2.4% n = 140" [ref=e782]:
+                    - generic [ref=e783]: p = 0.326
+                    - generic [ref=e784]:
+                      - text: d = 0.09
+                      - generic [ref=e785]: (negligible)
+                    - generic [ref=e786]: Δ = +2.4%
+                    - generic [ref=e787]: n = 140
+                  - cell "p = 0.426 d = -0.06 (negligible) Δ = -1.2% n = 140" [ref=e788]:
+                    - generic [ref=e789]: p = 0.426
+                    - generic [ref=e790]:
+                      - text: d = -0.06
+                      - generic [ref=e791]: (negligible)
+                    - generic [ref=e792]: Δ = -1.2%
+                    - generic [ref=e793]: n = 140
+                  - cell "p = 0.770 d = 0.07 (negligible) Δ = +1.7% n = 140" [ref=e794]:
+                    - generic [ref=e795]: p = 0.770
+                    - generic [ref=e796]:
+                      - text: d = 0.07
+                      - generic [ref=e797]: (negligible)
+                    - generic [ref=e798]: Δ = +1.7%
+                    - generic [ref=e799]: n = 140
+                  - cell "p = 0.099 d = -0.08 (negligible) Δ = -2.5% n = 140" [ref=e800]:
+                    - generic [ref=e801]: p = 0.099
+                    - generic [ref=e802]:
+                      - text: d = -0.08
+                      - generic [ref=e803]: (negligible)
+                    - generic [ref=e804]: Δ = -2.5%
+                    - generic [ref=e805]: n = 140
+                - row "conflict 70 — — — p = 0.324 d = -0.07 (negligible) Δ = -2.1% n = 139 p = 0.509 d = -0.04 (negligible) Δ = -1.0% n = 139 p = 0.362 d = -0.07 (negligible) Δ = -1.7% n = 139 p = 0.014* d = -0.17 (negligible) Δ = -5.7% n = 139" [ref=e806]:
+                  - cell "conflict 70" [ref=e807]
+                  - cell "—" [ref=e808]
+                  - cell "—" [ref=e809]
+                  - cell "—" [ref=e810]
+                  - cell "p = 0.324 d = -0.07 (negligible) Δ = -2.1% n = 139" [ref=e811]:
+                    - generic [ref=e812]: p = 0.324
+                    - generic [ref=e813]:
+                      - text: d = -0.07
+                      - generic [ref=e814]: (negligible)
+                    - generic [ref=e815]: Δ = -2.1%
+                    - generic [ref=e816]: n = 139
+                  - cell "p = 0.509 d = -0.04 (negligible) Δ = -1.0% n = 139" [ref=e817]:
+                    - generic [ref=e818]: p = 0.509
+                    - generic [ref=e819]:
+                      - text: d = -0.04
+                      - generic [ref=e820]: (negligible)
+                    - generic [ref=e821]: Δ = -1.0%
+                    - generic [ref=e822]: n = 139
+                  - cell "p = 0.362 d = -0.07 (negligible) Δ = -1.7% n = 139" [ref=e823]:
+                    - generic [ref=e824]: p = 0.362
+                    - generic [ref=e825]:
+                      - text: d = -0.07
+                      - generic [ref=e826]: (negligible)
+                    - generic [ref=e827]: Δ = -1.7%
+                    - generic [ref=e828]: n = 139
+                  - cell "p = 0.014* d = -0.17 (negligible) Δ = -5.7% n = 139" [ref=e829]:
+                    - generic [ref=e830]: p = 0.014*
+                    - generic [ref=e831]:
+                      - text: d = -0.17
+                      - generic [ref=e832]: (negligible)
+                    - generic [ref=e833]: Δ = -5.7%
+                    - generic [ref=e834]: n = 139
+                - row "unanswerable partial p = 1.8e-23*** d = -1.36 (large) Δ = -44.2% n = 140 p = 1.8e-23*** d = -1.51 (large) Δ = -39.7% n = 140 p = 5.4e-16*** d = -1.07 (large) Δ = -39.2% n = 140 p = 0.954 d = -0.00 (negligible) Δ = -0.1% n = 140 p = 0.375 d = 0.08 (negligible) Δ = +1.8% n = 140 p = 0.488 d = -0.02 (negligible) Δ = -0.7% n = 140 p = 1.92e-4*** d = -0.28 (small) Δ = -9.9% n = 140" [ref=e835]:
+                  - cell "unanswerable partial" [ref=e836]
+                  - cell "p = 1.8e-23*** d = -1.36 (large) Δ = -44.2% n = 140" [ref=e837]:
+                    - generic [ref=e838]: p = 1.8e-23***
+                    - generic [ref=e839]:
+                      - text: d = -1.36
+                      - generic [ref=e840]: (large)
+                    - generic [ref=e841]: Δ = -44.2%
+                    - generic [ref=e842]: n = 140
+                  - cell "p = 1.8e-23*** d = -1.51 (large) Δ = -39.7% n = 140" [ref=e843]:
+                    - generic [ref=e844]: p = 1.8e-23***
+                    - generic [ref=e845]:
+                      - text: d = -1.51
+                      - generic [ref=e846]: (large)
+                    - generic [ref=e847]: Δ = -39.7%
+                    - generic [ref=e848]: n = 140
+                  - cell "p = 5.4e-16*** d = -1.07 (large) Δ = -39.2% n = 140" [ref=e849]:
+                    - generic [ref=e850]: p = 5.4e-16***
+                    - generic [ref=e851]:
+                      - text: d = -1.07
+                      - generic [ref=e852]: (large)
+                    - generic [ref=e853]: Δ = -39.2%
+                    - generic [ref=e854]: n = 140
+                  - cell "p = 0.954 d = -0.00 (negligible) Δ = -0.1% n = 140" [ref=e855]:
+                    - generic [ref=e856]: p = 0.954
+                    - generic [ref=e857]:
+                      - text: d = -0.00
+                      - generic [ref=e858]: (negligible)
+                    - generic [ref=e859]: Δ = -0.1%
+                    - generic [ref=e860]: n = 140
+                  - cell "p = 0.375 d = 0.08 (negligible) Δ = +1.8% n = 140" [ref=e861]:
+                    - generic [ref=e862]: p = 0.375
+                    - generic [ref=e863]:
+                      - text: d = 0.08
+                      - generic [ref=e864]: (negligible)
+                    - generic [ref=e865]: Δ = +1.8%
+                    - generic [ref=e866]: n = 140
+                  - cell "p = 0.488 d = -0.02 (negligible) Δ = -0.7% n = 140" [ref=e867]:
+                    - generic [ref=e868]: p = 0.488
+                    - generic [ref=e869]:
+                      - text: d = -0.02
+                      - generic [ref=e870]: (negligible)
+                    - generic [ref=e871]: Δ = -0.7%
+                    - generic [ref=e872]: n = 140
+                  - cell "p = 1.92e-4*** d = -0.28 (small) Δ = -9.9% n = 140" [ref=e873]:
+                    - generic [ref=e874]: p = 1.92e-4***
+                    - generic [ref=e875]:
+                      - text: d = -0.28
+                      - generic [ref=e876]: (small)
+                    - generic [ref=e877]: Δ = -9.9%
+                    - generic [ref=e878]: n = 140
+                - row "unanswerable full p = 1.2e-23*** d = -1.66 (large) Δ = -70.2% n = 140 p = 1.2e-23*** d = -2.16 (large) Δ = -76.0% n = 140 p = 1.3e-26*** d = -2.68 (large) Δ = -83.3% n = 140 p = 1.63e-6*** d = -0.42 (small) Δ = -12.5% n = 140 p = 7.37e-6*** d = -0.38 (small) Δ = -6.6% n = 140 p = 4.0e-19*** d = -0.46 (small) Δ = -11.8% n = 140 p = 3.1e-14*** d = -0.83 (large) Δ = -41.0% n = 140" [ref=e879]:
+                  - cell "unanswerable full" [ref=e880]
+                  - cell "p = 1.2e-23*** d = -1.66 (large) Δ = -70.2% n = 140" [ref=e881]:
+                    - generic [ref=e882]: p = 1.2e-23***
+                    - generic [ref=e883]:
+                      - text: d = -1.66
+                      - generic [ref=e884]: (large)
+                    - generic [ref=e885]: Δ = -70.2%
+                    - generic [ref=e886]: n = 140
+                  - cell "p = 1.2e-23*** d = -2.16 (large) Δ = -76.0% n = 140" [ref=e887]:
+                    - generic [ref=e888]: p = 1.2e-23***
+                    - generic [ref=e889]:
+                      - text: d = -2.16
+                      - generic [ref=e890]: (large)
+                    - generic [ref=e891]: Δ = -76.0%
+                    - generic [ref=e892]: n = 140
+                  - cell "p = 1.3e-26*** d = -2.68 (large) Δ = -83.3% n = 140" [ref=e893]:
+                    - generic [ref=e894]: p = 1.3e-26***
+                    - generic [ref=e895]:
+                      - text: d = -2.68
+                      - generic [ref=e896]: (large)
+                    - generic [ref=e897]: Δ = -83.3%
+                    - generic [ref=e898]: n = 140
+                  - cell "p = 1.63e-6*** d = -0.42 (small) Δ = -12.5% n = 140" [ref=e899]:
+                    - generic [ref=e900]: p = 1.63e-6***
+                    - generic [ref=e901]:
+                      - text: d = -0.42
+                      - generic [ref=e902]: (small)
+                    - generic [ref=e903]: Δ = -12.5%
+                    - generic [ref=e904]: n = 140
+                  - cell "p = 7.37e-6*** d = -0.38 (small) Δ = -6.6% n = 140" [ref=e905]:
+                    - generic [ref=e906]: p = 7.37e-6***
+                    - generic [ref=e907]:
+                      - text: d = -0.38
+                      - generic [ref=e908]: (small)
+                    - generic [ref=e909]: Δ = -6.6%
+                    - generic [ref=e910]: n = 140
+                  - cell "p = 4.0e-19*** d = -0.46 (small) Δ = -11.8% n = 140" [ref=e911]:
+                    - generic [ref=e912]: p = 4.0e-19***
+                    - generic [ref=e913]:
+                      - text: d = -0.46
+                      - generic [ref=e914]: (small)
+                    - generic [ref=e915]: Δ = -11.8%
+                    - generic [ref=e916]: n = 140
+                  - cell "p = 3.1e-14*** d = -0.83 (large) Δ = -41.0% n = 140" [ref=e917]:
+                    - generic [ref=e918]: p = 3.1e-14***
+                    - generic [ref=e919]:
+                      - text: d = -0.83
+                      - generic [ref=e920]: (large)
+                    - generic [ref=e921]: Δ = -41.0%
+                    - generic [ref=e922]: n = 140
+            - generic [ref=e923]:
+              - paragraph [ref=e924]: "p-value: probability of observing a difference at least this large if the perturbation had no effect."
+              - paragraph [ref=e925]: "Cohen's d: effect size on paired differences. 0.2 = small, 0.5 = medium, 0.8+ = large."
+              - paragraph [ref=e926]: "Δ: absolute change in the metric (condition − baseline), in percentage points."
+  - button "Open Next.js Dev Tools" [ref=e18] [cursor=pointer]:
+    - img [ref=e19]
+  - alert [ref=e22]
+  - generic [ref=e621]: clean

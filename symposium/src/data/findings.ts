@@ -4,42 +4,41 @@ export interface Finding {
   metric?: string;
 }
 
-// Placeholder findings -- replace with actual experimental results
 export const findings: Finding[] = [
   {
-    statement: "Conflicting evidence is more damaging than noise",
+    statement: "Unanswerable is the most catastrophic condition",
     detail:
-      "Even at 30% noise levels, retrieval metrics remained above 0.70. But conflict at 50/50 ratio dropped task scores below 0.40.",
-    metric: "Task score: 0.82 (clean) vs 0.38 (conflict 50/50)",
+      "Removing all answer-bearing passages causes a near-total collapse across every metric family. Retrieval drops from 88.3% to 1.0% and task score falls to 18.4% -- yet the system never issues an abstention. It continues generating answers with no supporting evidence.",
+    metric: "Retrieval: 88.3% (clean) → 1.0% (unanswerable full) | Task score: 58.8% → 18.4%",
   },
   {
-    statement: "The model rarely admits uncertainty",
+    statement: "Conflict is the most invisible failure mode",
     detail:
-      "Under unanswerable conditions, the LLM still generated confident-sounding answers in most cases, only flagging insufficient evidence when all relevant passages were removed.",
-    metric: "Only 15% of unanswerable queries triggered an abstention response",
+      "At 70% conflict, retrieval holds at 88.4% -- identical to clean. The system finds and ranks contradicted passages with full confidence. Only groundedness metrics expose the problem: supported claim rate drops to ~10%, meaning the model generates claims that contradict its own cited evidence.",
+    metric: "Retrieval: 88.4% (conflict 70) vs. SCR: ~10% | Task score: 39.7%",
   },
   {
-    statement: "Retrieval degrades before generation",
+    statement: "MAP@k is the most sensitive noise indicator",
     detail:
-      "MAP@k showed measurable decline at noise 30%, while generation quality (task score) remained relatively stable until noise exceeded 50%.",
-    metric: "MAP@k dropped 42% at noise 70%; task score dropped 60%",
+      "Under noise injection, MAP@k falls from ~78% to ~25% at 70% noise while citation precision stays near 75%. The model anchors its citations to its top-ranked passage and holds on, even when the ranked list is mostly irrelevant.",
+    metric: "MAP@k: ~78% (clean) → ~25% (noise 70%) | Citation precision: ~75% throughout",
   },
   {
-    statement: "Groundedness metrics detect conflicts effectively",
+    statement: "Groundedness is already low at baseline",
     detail:
-      "NLI-based supported claim rate dropped sharply under conflict conditions, providing a reliable signal for evidence quality issues.",
-    metric: "Supported claim rate: 0.95 (clean) vs 0.38 (conflict 70/30)",
+      "The clean baseline groundedness score is just 16.8% -- the model struggles with strict biomedical citation discipline before any perturbation is applied. This means evaluating generation quality on task score alone is insufficient; groundedness must be tracked independently.",
+    metric: "Groundedness: 16.8% (clean) → 7.4% (noise 70%) → 2.0% (unanswerable full)",
   },
   {
-    statement: "Citation precision correlates with answer quality",
+    statement: "Factoid questions are the most vulnerable",
     detail:
-      "When retrieved passages were irrelevant, generated citations pointed to non-supportive evidence, creating a false sense of reliability.",
-    metric: "Citation precision: 1.00 (clean) vs 0.50 (noise 70%)",
+      "Across all conditions, factoid questions show the largest absolute task score drops. Yes/No questions demonstrate the most resilience -- their binary answer structure is harder to fully invalidate even under heavy perturbation, making question type a significant factor in RAG robustness.",
+    metric: "Yes/No task scores remain above 50% under moderate conditions where factoid scores fall below 30%",
   },
 ];
 
 export const implications = [
-  "RAG systems in healthcare need robust conflict detection before deployment",
-  "Abstention mechanisms should be built into clinical AI to handle uncertain evidence",
-  "Retrieval quality monitoring is essential -- generation quality alone is insufficient",
+  "Conflict injection is the hardest failure to detect operationally -- retrieval metrics look healthy while answer content is factually wrong. Groundedness monitoring is non-optional in clinical RAG deployments.",
+  "The system never abstains under unanswerable conditions. Any healthcare RAG deployment must include explicit abstention logic tied to evidence coverage thresholds.",
+  "Retrieval quality monitoring must run independently of generation quality -- MAP@k degradation precedes task score degradation, making it an early warning signal for pipeline stress.",
 ];

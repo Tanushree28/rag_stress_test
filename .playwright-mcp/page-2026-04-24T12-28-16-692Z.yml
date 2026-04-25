@@ -1,0 +1,13 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "RAG Stress-Test" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e6]: /
+        - generic [ref=e7]: Analytics
+    - main [ref=e8]:
+      - paragraph [ref=e9]: Loading aggregate data...
+  - button "Open Next.js Dev Tools" [ref=e15] [cursor=pointer]:
+    - img [ref=e16]
+  - alert [ref=e19]

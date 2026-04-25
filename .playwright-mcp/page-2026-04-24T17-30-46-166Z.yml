@@ -1,0 +1,24 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "RAG Stress-Test" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e6]: /
+        - generic [ref=e7]: Analytics
+      - generic [ref=e8]:
+        - 'generic "Macro-average: mean per question-type, then mean across types. Removes bias from uneven type mix in batch runs." [ref=e9] [cursor=pointer]':
+          - checkbox "Normalize by question type" [ref=e10]
+          - text: Normalize by question type
+        - generic [ref=e11]:
+          - generic [ref=e12]: Retriever
+          - combobox [ref=e13]:
+            - option "hybrid" [selected]
+            - option "faiss_only"
+            - option "bm25_only"
+            - option "no_rerank"
+    - main [ref=e14]:
+      - paragraph [ref=e15]: Loading aggregate data...
+  - button "Open Next.js Dev Tools" [ref=e21] [cursor=pointer]:
+    - img [ref=e22]
+  - alert [ref=e25]

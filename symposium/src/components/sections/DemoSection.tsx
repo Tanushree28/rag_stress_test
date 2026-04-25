@@ -10,27 +10,64 @@ const pipelineStages = [
   { label: "Corpus", desc: "2,000+ PubMed chunks indexed with MedCPT embeddings" },
   { label: "Retrieval", desc: "Dense vector search returns top 20 candidates" },
   { label: "Reranking", desc: "Cross-encoder scores and selects top 5" },
+  { label: "Perturbation", desc: "Adversarial condition applied to retrieved passages" },
   { label: "Generation", desc: "LLaMA 3.1:8b generates a cited answer" },
   { label: "Evaluation", desc: "Metrics assess retrieval and answer quality" },
 ];
 
+type PerturbationType = "none" | "noise" | "conflict" | "unanswerable";
+
+const perturbationOptions: { id: PerturbationType; label: string; badge: string; color: string; explanation: string }[] = [
+  {
+    id: "none",
+    label: "None (Clean)",
+    badge: "CLEAN",
+    color: "text-green-400 border-green-500/30 bg-green-500/10",
+    explanation: "No perturbation — clean passages passed directly to the generator.",
+  },
+  {
+    id: "noise",
+    label: "Noise 70%",
+    badge: "NOISE",
+    color: "text-orange-400 border-orange-500/30 bg-orange-500/10",
+    explanation: "70% of the top-5 passages replaced with irrelevant near-miss documents sharing disease keywords. The generator receives mostly unhelpful context.",
+  },
+  {
+    id: "conflict",
+    label: "Conflict 70/30",
+    badge: "CONFLICT",
+    color: "text-red-400 border-red-500/30 bg-red-500/10",
+    explanation: "70% of passages rewritten by LLaMA to contradict their original claims. The generator receives plausible-looking but factually inverted evidence.",
+  },
+  {
+    id: "unanswerable",
+    label: "Unanswerable Full",
+    badge: "UNANSWERABLE",
+    color: "text-purple-400 border-purple-500/30 bg-purple-500/10",
+    explanation: "All answer-bearing passages removed. The retrieved context contains no information that could support a correct answer.",
+  },
+];
+
 // Each step maps to: a pipeline highlight index, a status message, and what content is visible
 const steps = [
-  { pipeline: 1, status: "Searching 2,000+ PubMed chunks...", showPassages: false, showAnswer: false },
-  { pipeline: 2, status: "Reranking 20 candidates with cross-encoder...", showPassages: false, showAnswer: false },
-  { pipeline: 2, status: "Top 5 passages retrieved", showPassages: true, showAnswer: false },
-  { pipeline: 3, status: "Generating answer with LLaMA 3.1:8b...", showPassages: true, showAnswer: true },
-  { pipeline: 4, status: "Evaluation complete", showPassages: true, showAnswer: true },
+  { pipeline: 1, status: "Searching 2,000+ PubMed chunks...", showPassages: false, showAnswer: false, showPerturbation: false },
+  { pipeline: 2, status: "Reranking 20 candidates with cross-encoder...", showPassages: false, showAnswer: false, showPerturbation: false },
+  { pipeline: 2, status: "Top 5 passages retrieved", showPassages: true, showAnswer: false, showPerturbation: false },
+  { pipeline: 3, status: "Applying perturbation to retrieved passages...", showPassages: true, showAnswer: false, showPerturbation: true },
+  { pipeline: 4, status: "Generating answer with LLaMA 3.1:8b...", showPassages: true, showAnswer: true, showPerturbation: true },
+  { pipeline: 5, status: "Evaluation complete", showPassages: true, showAnswer: true, showPerturbation: true },
 ];
 
 export function DemoSection() {
   const [selectedQ, setSelectedQ] = useState(0);
   const [step, setStep] = useState(-1);
+  const [perturbation, setPerturbation] = useState<PerturbationType>("none");
 
   const question = demoQuestions[selectedQ];
   const started = step >= 0;
   const atEnd = step === steps.length - 1;
   const current = started ? steps[step] : null;
+  const activePerturbation = perturbationOptions.find((p) => p.id === perturbation)!;
 
   const handleNext = () => {
     if (!started) {
@@ -97,14 +134,14 @@ export function DemoSection() {
         <AnimatedStep delay={0.4} direction="right">
           <div className="bg-white/5 border border-white/10 rounded-xl p-6 flex flex-col gap-4">
             {/* Question selector */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-2">
               <select
                 value={selectedQ}
                 onChange={(e) => {
                   setSelectedQ(Number(e.target.value));
                   reset();
                 }}
-                className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white appearance-none cursor-pointer"
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white appearance-none cursor-pointer"
               >
                 {demoQuestions.map((q, i) => (
                   <option key={q.id} value={i} className="bg-ucm-gray-800">
@@ -112,6 +149,24 @@ export function DemoSection() {
                   </option>
                 ))}
               </select>
+
+              {/* Perturbation selector */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] uppercase tracking-widest text-white/30 font-semibold shrink-0">Perturbation:</span>
+                {perturbationOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => { setPerturbation(opt.id); reset(); }}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                      perturbation === opt.id
+                        ? opt.color + " opacity-100"
+                        : "text-white/30 border-white/10 bg-white/5 hover:text-white/60"
+                    }`}
+                  >
+                    {opt.badge}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Question display */}
@@ -154,6 +209,25 @@ export function DemoSection() {
                   {question.passages.slice(0, 5).map((p, i) => (
                     <PassageCard key={p.pmid} passage={p} index={i} />
                   ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Perturbation stage panel */}
+            <AnimatePresence>
+              {current?.showPerturbation && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className={`rounded-lg border p-3 ${activePerturbation.color}`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] uppercase tracking-wider font-bold">
+                      Perturbation: {activePerturbation.badge}
+                    </span>
+                  </div>
+                  <p className="text-xs opacity-80 leading-relaxed">{activePerturbation.explanation}</p>
                 </motion.div>
               )}
             </AnimatePresence>

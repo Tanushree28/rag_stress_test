@@ -200,26 +200,38 @@ def rerank(query: str, candidates: list[dict], top_k: int = 5) -> list[dict]:
 # S2.4 -- Hybrid retrieval pipeline
 # ---------------------------------------------------------------------------
 
-def retrieve(query: str, initial_k: int = 100, top_k: int = 5) -> list[dict]:
-    """Hybrid retrieval: FAISS semantic search + keyword search -> cross-encoder rerank.
+RETRIEVER_MODES = ("hybrid", "faiss_only", "bm25_only", "no_rerank")
 
-    1. FAISS: top initial_k by MedCPT embedding similarity
-    2. Keyword: top 50 by SQLite FTS5/BM25 (or LIKE fallback)
-    3. Merge & deduplicate by chunk id
-    4. Cross-encoder rerank combined candidates -> top_k
 
-    Returns top_k passages with scores from both stages.
+def retrieve(
+    query: str,
+    initial_k: int = 100,
+    top_k: int = 5,
+    mode: str = "hybrid",
+) -> list[dict]:
+    """Retrieve top_k passages. Mode controls the ablation:
+
+    - hybrid    : FAISS + BM25 keyword merge -> cross-encoder rerank (default)
+    - faiss_only: FAISS candidates only -> cross-encoder rerank
+    - bm25_only : SQLite FTS BM25 candidates only -> cross-encoder rerank
+    - no_rerank : hybrid merge, keep FAISS-first order, skip cross-encoder
     """
-    # Semantic search
-    query_embedding = encode_query(query)
-    faiss_candidates = search_faiss(query_embedding, k=initial_k)
+    if mode not in RETRIEVER_MODES:
+        raise ValueError(f"Unknown retriever mode: {mode}. Valid: {RETRIEVER_MODES}")
 
-    # Keyword search
-    keyword_candidates = search_keywords(query, limit=50)
+    faiss_candidates: list[dict] = []
+    keyword_candidates: list[dict] = []
 
-    # Merge: deduplicate by chunk id, FAISS results take priority
-    seen_ids = set()
-    merged = []
+    if mode in ("hybrid", "faiss_only", "no_rerank"):
+        query_embedding = encode_query(query)
+        faiss_candidates = search_faiss(query_embedding, k=initial_k)
+
+    if mode in ("hybrid", "bm25_only", "no_rerank"):
+        keyword_candidates = search_keywords(query, limit=50)
+
+    # Merge (FAISS first for priority order)
+    seen_ids: set = set()
+    merged: list[dict] = []
     for c in faiss_candidates:
         cid = c.get("id") or c.get("chunk_id")
         if cid not in seen_ids:
@@ -232,18 +244,18 @@ def retrieve(query: str, initial_k: int = 100, top_k: int = 5) -> list[dict]:
             merged.append(c)
 
     logger.info(
-        "Hybrid retrieval: %d FAISS + %d keyword = %d unique candidates for: %s",
-        len(faiss_candidates), len(keyword_candidates), len(merged), query[:80],
+        "Retrieval[%s]: %d FAISS + %d keyword = %d unique for: %s",
+        mode, len(faiss_candidates), len(keyword_candidates), len(merged), query[:80],
     )
 
-    # Cross-encoder rerank the merged candidate pool
-    results = rerank(query, merged, top_k=top_k)
+    if mode == "no_rerank":
+        # Keep candidate order (FAISS first), truncate to top_k
+        for i, c in enumerate(merged[:top_k]):
+            c["rerank_score"] = c.get("faiss_score", 0.0)
+            c["rerank_rank"] = i
+        return merged[:top_k]
 
-    logger.info(
-        "Reranked to %d for: %s",
-        len(results), query[:80],
-    )
-    return results
+    return rerank(query, merged, top_k=top_k)
 
 
 # ---------------------------------------------------------------------------

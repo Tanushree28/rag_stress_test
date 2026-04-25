@@ -126,6 +126,32 @@ export interface MetricStats {
   mean: number | null;
   std: number | null;
   n: number;
+  ci95_lo?: number | null;
+  ci95_hi?: number | null;
+}
+
+export interface SignificanceMetric {
+  n_pairs: number;
+  mean_diff?: number;
+  mean_baseline?: number;
+  mean_condition?: number;
+  cohens_d?: number | null;
+  statistic?: number | null;
+  p_value?: number | null;
+  test?: string;
+  error?: string;
+}
+
+export interface SignificanceResult {
+  condition: string;
+  baseline: string;
+  metrics: Record<string, SignificanceMetric>;
+}
+
+export interface SignificanceResponse {
+  baseline: string;
+  test: string;
+  results: SignificanceResult[];
 }
 
 export interface DegradationCondition {
@@ -205,7 +231,7 @@ export const api = {
   },
 
   getConditions: () =>
-    request<{ conditions: string[] }>("/conditions"),
+    request<{ conditions: string[]; retriever_modes?: string[] }>("/conditions"),
 
   ask: (body: {
     question: string;
@@ -249,17 +275,45 @@ export const api = {
     );
   },
 
-  getAggregateStats: (params?: { group_by?: string }) => {
+  getAggregateStats: (params?: {
+    group_by?: string;
+    retriever_mode?: string;
+    normalize?: string;
+  }) => {
     const qs = new URLSearchParams();
     if (params?.group_by) qs.set("group_by", params.group_by);
+    if (params?.retriever_mode) qs.set("retriever_mode", params.retriever_mode);
+    if (params?.normalize) qs.set("normalize", params.normalize);
     const query = qs.toString();
     return request<AggregateResponse>(
       `/aggregate/stats${query ? `?${query}` : ""}`
     );
   },
 
-  getDegradation: () =>
-    request<DegradationResponse>("/aggregate/degradation"),
+  getDegradation: (params?: {
+    bootstrap?: number;
+    retriever_mode?: string;
+    normalize?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.bootstrap != null) qs.set("bootstrap", String(params.bootstrap));
+    if (params?.retriever_mode) qs.set("retriever_mode", params.retriever_mode);
+    if (params?.normalize) qs.set("normalize", params.normalize);
+    const query = qs.toString();
+    return request<DegradationResponse>(
+      `/aggregate/degradation${query ? `?${query}` : ""}`
+    );
+  },
+
+  getSignificance: (params?: { baseline?: string; test?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.baseline) qs.set("baseline", params.baseline);
+    if (params?.test) qs.set("test", params.test);
+    const query = qs.toString();
+    return request<SignificanceResponse>(
+      `/aggregate/significance${query ? `?${query}` : ""}`
+    );
+  },
 
   getCrosstab: () =>
     request<CrosstabResponse>("/aggregate/crosstab"),

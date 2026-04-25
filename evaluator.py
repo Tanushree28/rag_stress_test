@@ -120,106 +120,168 @@ def retrieval_metrics(
 # S5.2 -- NLI-based groundedness
 # ---------------------------------------------------------------------------
 
+_CITE_RE = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+
+
 def _strip_citations(text: str) -> str:
     """Remove citation markers like [1], [2], [1,3] and 'states that' phrasing."""
-    text = re.sub(r"\[\d+(?:,\s*\d+)*\]", "", text)
+    text = _CITE_RE.sub("", text)
     text = re.sub(r"\bstates\s+that\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bpassage\b", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
 
-def _split_sentences(text: str) -> list[str]:
-    """Simple sentence splitter, strips citation markers for cleaner NLI input."""
+def _parse_sentence_citations(sentence: str) -> list[int]:
+    """Extract the 1-indexed passage numbers cited anywhere in this sentence."""
+    cites: list[int] = []
+    for match in _CITE_RE.findall(sentence):
+        for num in match.split(","):
+            num = num.strip()
+            if num.isdigit():
+                cites.append(int(num))
+    return cites
+
+
+def _split_sentences(text: str) -> list[dict]:
+    """Split into sentences; return list of {raw, clean, cites} dicts.
+
+    - raw: original sentence with citation markers (used to parse cites)
+    - clean: citation markers stripped (used as NLI hypothesis)
+    - cites: list of 1-indexed passage numbers referenced in the sentence
+    """
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
-    cleaned = []
+    out = []
     for s in sentences:
-        s = _strip_citations(s.strip())
-        if len(s) > 10:
-            cleaned.append(s)
-    return cleaned
+        raw = s.strip()
+        if not raw:
+            continue
+        clean = _strip_citations(raw)
+        if len(clean) <= 10:
+            continue
+        out.append({
+            "raw": raw,
+            "clean": clean,
+            "cites": _parse_sentence_citations(raw),
+        })
+    return out
+
+
+ENTAILMENT_THRESHOLD = 0.5
 
 
 def nli_groundedness(answer: str, passages: list[dict]) -> dict:
     """Score groundedness using cross-encoder/nli-deberta-v3-base.
 
-    Returns:
-        supported_claim_rate: fraction of answer sentences entailed by any passage
-        citation_precision: fraction of cited passages that entail at least one claim
-        avg_entailment_score: mean entailment probability across all (sentence, passage) pairs
-        details: per-sentence NLI results
+    Definitions used in the paper:
+      supported_claim_rate  = fraction of claim sentences whose best-passage
+                              entailment prob exceeds ENTAILMENT_THRESHOLD.
+      citation_precision    = of all [N] citations emitted by the LLM, fraction
+                              where the cited passage actually entails the
+                              surrounding claim (entailment >= threshold).
+                              Sentences without any citation are skipped.
+      avg_entailment_score  = mean over claim sentences of the max entailment
+                              probability across retrieved passages (the actual
+                              groundedness signal, not the diluted N*M average).
+      details               = per-sentence results including cite verdicts.
     """
     if not passages or not answer:
         return {
             "supported_claim_rate": 0.0,
             "citation_precision": 0.0,
+            "citations_total": 0,
+            "citations_correct": 0,
             "avg_entailment_score": 0.0,
             "details": [],
         }
 
     nli = _get_nli_model()
-    sentences = _split_sentences(answer)
-    if not sentences:
+    sents = _split_sentences(answer)
+    if not sents:
         return {
             "supported_claim_rate": 0.0,
             "citation_precision": 0.0,
+            "citations_total": 0,
+            "citations_correct": 0,
             "avg_entailment_score": 0.0,
             "details": [],
         }
 
     passage_texts = [p["text"] for p in passages]
+    n_passages = len(passage_texts)
 
-    # Score all (sentence, passage) pairs
+    # Score all (passage, sentence_clean) pairs. NLI: premise=passage, hypothesis=claim.
     pairs = []
-    pair_map = []  # (sent_idx, pass_idx)
-    for si, sent in enumerate(sentences):
-        for pi, ptext in enumerate(passage_texts):
-            pairs.append((ptext, sent))  # (premise, hypothesis)
-            pair_map.append((si, pi))
+    for s in sents:
+        for ptext in passage_texts:
+            pairs.append((ptext, s["clean"]))
 
-    raw_scores = nli.predict(pairs)  # shape: (n_pairs, 3) logits for 3-class NLI
-
-    # Apply softmax to convert logits to probabilities
-    # nli-deberta-v3-base outputs: [contradiction, entailment, neutral]
+    raw_scores = nli.predict(pairs)
     if hasattr(raw_scores[0], "__len__"):
         probs = softmax(np.array(raw_scores), axis=1)
     else:
         probs = np.array(raw_scores).reshape(-1, 1)
 
-    # Parse scores into per-sentence results
+    entail_matrix = probs[:, 1].reshape(len(sents), n_passages)  # [S, P]
+
     details = []
-    passage_supports = set()
     supported_count = 0
+    max_entail_per_sent: list[float] = []
+    citations_total = 0
+    citations_correct = 0
 
-    for si, sent in enumerate(sentences):
-        sent_result = {"sentence": sent, "supported": False, "best_passage": -1, "best_score": 0.0}
-        for pi in range(len(passage_texts)):
-            idx = si * len(passage_texts) + pi
-            entailment_score = float(probs[idx][1])
+    for si, s in enumerate(sents):
+        row = entail_matrix[si]
+        best_pi = int(np.argmax(row))
+        best_score = float(row[best_pi])
+        supported = best_score >= ENTAILMENT_THRESHOLD
 
-            if entailment_score > sent_result["best_score"]:
-                sent_result["best_score"] = entailment_score
-                sent_result["best_passage"] = pi
-
-        if sent_result["best_score"] > 0.5:
-            sent_result["supported"] = True
+        if supported:
             supported_count += 1
-            passage_supports.add(sent_result["best_passage"])
+        max_entail_per_sent.append(best_score)
 
-        details.append(sent_result)
+        # Per-citation verification: each [N] in this sentence should be
+        # supported by passage N entailing this sentence's claim.
+        cite_verdicts = []
+        for cite in s["cites"]:
+            pi = cite - 1  # 1-indexed -> 0-indexed
+            if 0 <= pi < n_passages:
+                cite_score = float(row[pi])
+                correct = cite_score >= ENTAILMENT_THRESHOLD
+                citations_total += 1
+                if correct:
+                    citations_correct += 1
+                cite_verdicts.append({
+                    "cite": cite,
+                    "score": cite_score,
+                    "correct": correct,
+                })
+            else:
+                # Cited passage index is out of range -> wrong citation
+                citations_total += 1
+                cite_verdicts.append({"cite": cite, "score": 0.0, "correct": False})
 
-    supported_claim_rate = supported_count / len(sentences) if sentences else 0.0
-    citation_precision = len(passage_supports) / len(passage_texts) if passage_texts else 0.0
+        details.append({
+            "sentence": s["clean"],
+            "cites": s["cites"],
+            "supported": supported,
+            "best_passage": best_pi,
+            "best_score": best_score,
+            "cite_verdicts": cite_verdicts,
+        })
 
-    all_entailment = []
-    for si in range(len(sentences)):
-        for pi in range(len(passage_texts)):
-            idx = si * len(passage_texts) + pi
-            all_entailment.append(float(probs[idx][1]))
+    supported_claim_rate = supported_count / len(sents)
+    citation_precision = (
+        citations_correct / citations_total if citations_total > 0 else 0.0
+    )
+    avg_entail = float(np.mean(max_entail_per_sent)) if max_entail_per_sent else 0.0
 
     return {
         "supported_claim_rate": supported_claim_rate,
         "citation_precision": citation_precision,
-        "avg_entailment_score": float(np.mean(all_entailment)) if all_entailment else 0.0,
+        "citations_total": citations_total,
+        "citations_correct": citations_correct,
+        "avg_entailment_score": avg_entail,
         "details": details,
     }
 

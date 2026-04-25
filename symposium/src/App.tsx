@@ -5,15 +5,19 @@ import { HeroSection } from "./components/sections/HeroSection";
 import { ConceptSection } from "./components/sections/ConceptSection";
 import { DemoSection } from "./components/sections/DemoSection";
 import { StressTestSection } from "./components/sections/StressTestSection";
+import { QuestionTypesSection } from "./components/sections/QuestionTypesSection";
 import { ShowcaseSection } from "./components/sections/ShowcaseSection";
+import { ResultsSection } from "./components/sections/ResultsSection";
 import { InsightsSection } from "./components/sections/InsightsSection";
 
 const sectionIds = [
   "hero",
   "concepts",
   "demo",
+  "questions",
   "stress",
   "dashboard",
+  "results",
   "insights",
 ];
 
@@ -69,8 +73,10 @@ export default function App() {
         <HeroSection />
         <ConceptSection />
         <DemoSection />
+        <QuestionTypesSection />
         <StressTestSection />
         <ShowcaseSection />
+        <ResultsSection />
         <InsightsSection />
       </main>
     </>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const sectionIds = ["hero", "concepts", "demo", "stress", "dashboard", "insights"];
+const sectionIds = ["hero", "concepts", "demo", "questions", "stress", "dashboard", "results", "insights"];
 
 export function ProgressIndicator() {
   const [activeIndex, setActiveIndex] = useState(0);

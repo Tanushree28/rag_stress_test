@@ -1,0 +1,202 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "RAG Stress-Test" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e6]: /
+        - generic [ref=e7]: Analytics
+      - generic [ref=e8]:
+        - generic [ref=e9]: Retriever
+        - combobox [ref=e10]:
+          - option "hybrid" [selected]
+          - option "faiss_only"
+          - option "bm25_only"
+          - option "no_rerank"
+    - main [ref=e11]:
+      - generic [ref=e23]:
+        - tablist [ref=e24]:
+          - tab "Degradation Curves" [active] [selected] [ref=e25]
+          - tab "Condition Summary" [ref=e26]
+          - tab "Metric Impact" [ref=e27]
+          - tab "Significance" [ref=e28]
+        - tabpanel "Degradation Curves" [ref=e927]:
+          - generic [ref=e928]:
+            - generic [ref=e929]:
+              - heading "Degradation Curves" [level=3] [ref=e930]
+              - paragraph [ref=e931]: These charts show how pipeline performance degrades as perturbation intensity increases. Each curve represents a metric tracked across increasing levels of noise, conflict, or passage removal. The baseline (clean condition) anchors the left of each curve.
+            - generic [ref=e932]:
+              - heading "By Perturbation Family" [level=3] [ref=e933]
+              - generic [ref=e934]:
+                - generic [ref=e935]:
+                  - generic [ref=e936]:
+                    - heading "Noise Injection" [level=4] [ref=e937]
+                    - paragraph [ref=e938]: How adding irrelevant/near-miss passages degrades retrieval and generation
+                  - generic [ref=e940]:
+                    - list [ref=e942]:
+                      - listitem [ref=e943]:
+                        - img "Citation P legend icon" [ref=e944]
+                        - text: Citation P
+                      - listitem [ref=e945]:
+                        - img "MAP@k legend icon" [ref=e946]
+                        - text: MAP@k
+                      - listitem [ref=e947]:
+                        - img "SCR legend icon" [ref=e948]
+                        - text: SCR
+                      - listitem [ref=e949]:
+                        - img "Task Score legend icon" [ref=e950]
+                        - text: Task Score
+                      - listitem [ref=e951]:
+                        - img "nDCG@k legend icon" [ref=e952]
+                        - text: nDCG@k
+                    - application [ref=e953]:
+                      - generic [ref=e1032]:
+                        - generic [ref=e1033]:
+                          - generic [ref=e1035]: 0%
+                          - generic [ref=e1037]: 30%
+                          - generic [ref=e1039]: 50%
+                          - generic [ref=e1041]: 70%
+                        - generic [ref=e1042]:
+                          - generic [ref=e1044]: 0%
+                          - generic [ref=e1046]: 25%
+                          - generic [ref=e1048]: 50%
+                          - generic [ref=e1050]: 75%
+                          - generic [ref=e1052]: 100%
+                - generic [ref=e1053]:
+                  - generic [ref=e1054]:
+                    - heading "Conflict Injection" [level=4] [ref=e1055]
+                    - paragraph [ref=e1056]: How contradicted gold passages affect groundedness and answer quality
+                  - generic [ref=e1058]:
+                    - list [ref=e1060]:
+                      - listitem [ref=e1061]:
+                        - img "Citation P legend icon" [ref=e1062]
+                        - text: Citation P
+                      - listitem [ref=e1063]:
+                        - img "MAP@k legend icon" [ref=e1064]
+                        - text: MAP@k
+                      - listitem [ref=e1065]:
+                        - img "SCR legend icon" [ref=e1066]
+                        - text: SCR
+                      - listitem [ref=e1067]:
+                        - img "Task Score legend icon" [ref=e1068]
+                        - text: Task Score
+                      - listitem [ref=e1069]:
+                        - img "nDCG@k legend icon" [ref=e1070]
+                        - text: nDCG@k
+                    - application [ref=e1071]:
+                      - generic [ref=e1140]:
+                        - generic [ref=e1141]:
+                          - generic [ref=e1143]: 0%
+                          - generic [ref=e1145]: 50%
+                          - generic [ref=e1147]: 70%
+                        - generic [ref=e1148]:
+                          - generic [ref=e1150]: 0%
+                          - generic [ref=e1152]: 25%
+                          - generic [ref=e1154]: 50%
+                          - generic [ref=e1156]: 75%
+                          - generic [ref=e1158]: 100%
+                - generic [ref=e1159]:
+                  - generic [ref=e1160]:
+                    - heading "Unanswerable" [level=4] [ref=e1161]
+                    - paragraph [ref=e1162]: Impact of removing answer-bearing passages on the pipeline
+                  - generic [ref=e1164]:
+                    - list [ref=e1166]:
+                      - listitem [ref=e1167]:
+                        - img "Citation P legend icon" [ref=e1168]
+                        - text: Citation P
+                      - listitem [ref=e1169]:
+                        - img "MAP@k legend icon" [ref=e1170]
+                        - text: MAP@k
+                      - listitem [ref=e1171]:
+                        - img "SCR legend icon" [ref=e1172]
+                        - text: SCR
+                      - listitem [ref=e1173]:
+                        - img "Task Score legend icon" [ref=e1174]
+                        - text: Task Score
+                      - listitem [ref=e1175]:
+                        - img "nDCG@k legend icon" [ref=e1176]
+                        - text: nDCG@k
+                    - application [ref=e1177]:
+                      - generic [ref=e1246]:
+                        - generic [ref=e1247]:
+                          - generic [ref=e1249]: None
+                          - generic [ref=e1251]: Partial
+                          - generic [ref=e1253]: Full
+                        - generic [ref=e1254]:
+                          - generic [ref=e1256]: 0%
+                          - generic [ref=e1258]: 25%
+                          - generic [ref=e1260]: 50%
+                          - generic [ref=e1262]: 75%
+                          - generic [ref=e1264]: 100%
+            - generic [ref=e1265]:
+              - heading "Single Metric Across All Families" [level=3] [ref=e1266]
+              - generic [ref=e1267]:
+                - button "MAP@k" [ref=e1268]
+                - button "nDCG@k" [ref=e1269]
+                - button "SCR" [ref=e1270]
+                - button "Citation P" [ref=e1271]
+                - button "Task Score" [ref=e1272]
+              - generic [ref=e1273]:
+                - generic [ref=e1274]:
+                  - heading "MAP@k Across All Perturbation Types" [level=4] [ref=e1275]
+                  - paragraph [ref=e1276]: Shaded area shows 95% bootstrap confidence interval
+                - application [ref=e1279]:
+                  - generic [ref=e1314]:
+                    - generic [ref=e1315]:
+                      - generic [ref=e1317]: Noise 0%
+                      - generic [ref=e1319]: Noise 30%
+                      - generic [ref=e1321]: Noise 50%
+                      - generic [ref=e1323]: Noise 70%
+                      - generic [ref=e1325]: Conflict 0%
+                      - generic [ref=e1327]: Conflict 50%
+                      - generic [ref=e1329]: Conflict 70%
+                      - generic [ref=e1331]: Unanswerable None
+                      - generic [ref=e1333]: Unanswerable Partial
+                      - generic [ref=e1335]: Unanswerable Full
+                    - generic [ref=e1336]:
+                      - generic [ref=e1338]: 0%
+                      - generic [ref=e1340]: 25%
+                      - generic [ref=e1342]: 50%
+                      - generic [ref=e1344]: 75%
+                      - generic [ref=e1346]: 100%
+            - generic [ref=e1347]:
+              - heading "Question Type Resilience" [level=3] [ref=e1348]
+              - generic [ref=e1349]:
+                - generic [ref=e1350]:
+                  - heading "Task Score by Question Type x Condition" [level=4] [ref=e1351]
+                  - paragraph [ref=e1352]: Shows which question types are most affected by each perturbation
+                - generic [ref=e1354]:
+                  - list [ref=e1356]:
+                    - listitem [ref=e1357]:
+                      - img "factoid legend icon" [ref=e1358]
+                      - text: factoid
+                    - listitem [ref=e1360]:
+                      - img "list legend icon" [ref=e1361]
+                      - text: list
+                    - listitem [ref=e1363]:
+                      - img "summary legend icon" [ref=e1364]
+                      - text: summary
+                    - listitem [ref=e1366]:
+                      - img "yesno legend icon" [ref=e1367]
+                      - text: yesno
+                  - application [ref=e1369]:
+                    - generic [ref=e1490]:
+                      - generic [ref=e1491]:
+                        - generic [ref=e1493]: clean
+                        - generic [ref=e1495]: noise 30
+                        - generic [ref=e1497]: noise 50
+                        - generic [ref=e1499]: noise 70
+                        - generic [ref=e1501]: conflict 50
+                        - generic [ref=e1503]: conflict 70
+                        - generic [ref=e1505]: unanswerable partial
+                        - generic [ref=e1507]: unanswerable full
+                      - generic [ref=e1508]:
+                        - generic [ref=e1510]: 0%
+                        - generic [ref=e1512]: 25%
+                        - generic [ref=e1514]: 50%
+                        - generic [ref=e1516]: 75%
+                        - generic [ref=e1518]: 100%
+  - button "Open Next.js Dev Tools" [ref=e18] [cursor=pointer]:
+    - img [ref=e19]
+  - alert [ref=e22]
+  - generic [ref=e621]: clean

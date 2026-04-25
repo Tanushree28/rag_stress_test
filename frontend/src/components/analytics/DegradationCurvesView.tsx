@@ -139,7 +139,7 @@ function FamilyDegradationCard({
   family: CurveFamily;
   allConditions: DegradationCondition[];
 }) {
-  // Build combined data with all metrics
+  // Build combined data with all metrics (including CI delta for ErrorBar)
   const condMap = new Map(allConditions.map((c) => [c.condition, c]));
   const combinedData = family.conditions.map((cond, i) => {
     const data = condMap.get(cond);
@@ -152,6 +152,17 @@ function FamilyDegradationCard({
       point[metric.label] = stats?.mean ?? null;
       point[`${metric.label}_std`] = stats?.std ?? null;
       point[`${metric.label}_n`] = stats?.n ?? 0;
+      // Recharts ErrorBar expects [below-mean, above-mean] deltas
+      if (stats?.mean != null && stats?.ci95_lo != null && stats?.ci95_hi != null) {
+        point[`${metric.label}_ci`] = [
+          Math.max(0, stats.mean - stats.ci95_lo),
+          Math.max(0, stats.ci95_hi - stats.mean),
+        ];
+        point[`${metric.label}_ci_lo`] = stats.ci95_lo;
+        point[`${metric.label}_ci_hi`] = stats.ci95_hi;
+      } else {
+        point[`${metric.label}_ci`] = [0, 0];
+      }
     }
     return point;
   });
@@ -201,16 +212,18 @@ function FamilyDegradationCard({
                   {payload.map((entry) => {
                     if (entry.value == null) return null;
                     const val = entry.value as number;
-                    const stdKey = `${entry.name}_std`;
                     const nKey = `${entry.name}_n`;
-                    const std = entry.payload?.[stdKey] as number | null;
+                    const loKey = `${entry.name}_ci_lo`;
+                    const hiKey = `${entry.name}_ci_hi`;
                     const n = entry.payload?.[nKey] as number;
+                    const lo = entry.payload?.[loKey] as number | undefined;
+                    const hi = entry.payload?.[hiKey] as number | undefined;
                     return (
                       <p key={entry.name} style={{ color: entry.color }}>
                         {entry.name}: {(val * 100).toFixed(1)}%
-                        {std != null && (
+                        {lo != null && hi != null && (
                           <span className="text-gray-400">
-                            {" "}+/- {(std * 100).toFixed(1)}%
+                            {" "}[{(lo * 100).toFixed(1)}-{(hi * 100).toFixed(1)}%]
                           </span>
                         )}
                         <span className="text-gray-400"> (n={n})</span>
@@ -235,7 +248,15 @@ function FamilyDegradationCard({
               dot={{ r: 4, strokeWidth: 2 }}
               activeDot={{ r: 6, strokeWidth: 2 }}
               connectNulls
-            />
+            >
+              <ErrorBar
+                dataKey={`${metric.label}_ci`}
+                width={4}
+                strokeWidth={1.5}
+                stroke={metric.color}
+                direction="y"
+              />
+            </Line>
           ))}
         </LineChart>
       </ResponsiveContainer>
@@ -273,13 +294,25 @@ function SingleMetricCurveCard({
       const data = condMap.get(cond);
       const stats = data ? data[metricKey] : null;
       const mean = stats?.mean ?? null;
-      const std = stats?.std ?? 0;
+      // Prefer bootstrap CI if present, fall back to +/- 1 SD
+      const lo =
+        stats?.ci95_lo != null
+          ? stats.ci95_lo
+          : mean != null && stats?.std != null
+          ? Math.max(0, mean - stats.std)
+          : null;
+      const hi =
+        stats?.ci95_hi != null
+          ? stats.ci95_hi
+          : mean != null && stats?.std != null
+          ? mean + stats.std
+          : null;
       allData.push({
         x: `${family.label.split(" ")[0]} ${family.xLabels[i]}`,
         family: family.label,
         mean,
-        upper: mean != null ? mean + std : null,
-        lower: mean != null ? Math.max(0, mean - std) : null,
+        upper: hi,
+        lower: lo,
         n: stats?.n ?? 0,
       });
     }
@@ -292,7 +325,7 @@ function SingleMetricCurveCard({
           {metricLabel} Across All Perturbation Types
         </h4>
         <p className="text-xs text-gray-500">
-          Shaded area shows mean +/- 1 standard deviation
+          Shaded area shows 95% bootstrap confidence interval
         </p>
       </div>
       <ResponsiveContainer width="100%" height={240}>
@@ -466,7 +499,13 @@ function CrosstabHeatmap({ rows }: { rows: CrosstabRow[] }) {
 
 // ---- Main Component ----
 
-export function DegradationCurvesView() {
+export function DegradationCurvesView({
+  retrieverMode = "hybrid",
+  normalize,
+}: {
+  retrieverMode?: string;
+  normalize?: string;
+} = {}) {
   const [conditions, setConditions] = useState<DegradationCondition[]>([]);
   const [crosstabRows, setCrosstabRows] = useState<CrosstabRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -475,7 +514,14 @@ export function DegradationCurvesView() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([api.getDegradation(), api.getCrosstab()])
+    Promise.all([
+      api.getDegradation({
+        bootstrap: 1000,
+        retriever_mode: retrieverMode,
+        normalize,
+      }),
+      api.getCrosstab(),
+    ])
       .then(([deg, ct]) => {
         setConditions(deg.conditions);
         setCrosstabRows(ct.rows);
@@ -484,7 +530,7 @@ export function DegradationCurvesView() {
         setError(err instanceof Error ? err.message : "Failed to load data")
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [retrieverMode, normalize]);
 
   if (loading) {
     return (
