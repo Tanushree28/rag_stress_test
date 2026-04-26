@@ -5,9 +5,16 @@ then merge with SQLite FTS keyword results for hybrid retrieval,
 and rerank combined candidates with cross-encoder to top-5.
 
 Chunk metadata loaded from SQLite (db.py) instead of JSON.
+
+Environment variables:
+  RAG_FORCE_CPU_ENCODER=1  -- force MedCPT and cross-encoder onto CPU.
+    Use this on Colab/CUDA to match Mac-MPS-FP32 embeddings written
+    into the FAISS index. CUDA kernels produce slightly different
+    floats and will silently miss against the index.
 """
 
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -37,6 +44,14 @@ _faiss_index = None
 # Lazy loaders
 # ---------------------------------------------------------------------------
 
+def _select_device() -> str:
+    if os.environ.get("RAG_FORCE_CPU_ENCODER") == "1":
+        return "cpu"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 def _get_query_encoder():
     global _query_tokenizer, _query_encoder
     if _query_encoder is None:
@@ -44,9 +59,9 @@ def _get_query_encoder():
         _query_tokenizer = AutoTokenizer.from_pretrained(MEDCPT_QUERY_MODEL)
         _query_encoder = AutoModel.from_pretrained(MEDCPT_QUERY_MODEL)
         _query_encoder.eval()
-        device = "mps" if torch.backends.mps.is_available() else "cpu"
-        _query_encoder = _query_encoder.to(device)
-        logger.info("Query encoder loaded (device=%s)", device)
+        device = _select_device()
+        _query_encoder = _query_encoder.to(device).float()  # explicit FP32
+        logger.info("Query encoder loaded (device=%s, dtype=fp32)", device)
     return _query_tokenizer, _query_encoder
 
 
