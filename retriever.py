@@ -45,7 +45,13 @@ _faiss_index = None
 # ---------------------------------------------------------------------------
 
 def _select_device() -> str:
+    # Manual override always wins
     if os.environ.get("RAG_FORCE_CPU_ENCODER") == "1":
+        return "cpu"
+    # If CUDA is available, force CPU. The FAISS index was built with
+    # Mac MPS (or Mac CPU) embeddings -- CUDA kernels produce slightly
+    # different floats and silently miss against the index.
+    if torch.cuda.is_available():
         return "cpu"
     if torch.backends.mps.is_available():
         return "mps"
